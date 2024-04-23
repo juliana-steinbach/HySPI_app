@@ -652,6 +652,9 @@ def show():
         param_electricity=choice
     )
 
+    st.session_state.result_table_ammonia = result_table_ammonia
+    st.session_state.result_table_ammonia_smr = result_table_ammonia_smr
+
 
 
 if __name__ == "__main__":

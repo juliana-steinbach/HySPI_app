@@ -94,6 +94,10 @@ def main():
                     # Append selected city and its production to the list
                     st.session_state["selected_cities"].append({"city": city, "production": production})
 
+    st.write(st.session_state.result_table_ammonia)
+    st.write(st.session_state.result_table_ammonia_smr)
+
+
 
 if __name__ == "__main__":
     main()
