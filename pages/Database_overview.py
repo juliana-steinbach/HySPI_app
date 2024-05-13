@@ -9,7 +9,7 @@ def show():
 
     # Hydrogen LCA Calculator
     st.write(
-        "The Hydrogen LCA Calculator was built using inventories collected from the literature for foreground activities and a list of available scenarios for background electricity markets. The foreground inventory can be accessed [here](link), and it includes data for electrolyzers, balance of plant, treatment, storage, and distribution. The background inventory was brought to the foreground due to its significant contribution to the results. The calculator allows the user to select different scenarios for the electricity market in France in 2050. The repositories available contain the implementation of the prospective scenarios provided by the French Transmission System Operator - RTE.")
+        "The Hydrogen LCA Calculator was built using inventories collected from the literature for foreground activities and a list of available scenarios for background electricity markets. The foreground inventory can be accessed [here](Inventories), and it includes data for electrolyzers, balance of plant, treatment, storage, and distribution. The background inventory was brought to the foreground due to its significant contribution to the results. The calculator allows the user to select different scenarios for the electricity market in France in 2050. The repositories available contain the implementation of the prospective scenarios provided by the French Transmission System Operator - RTE.")
 
     # National Low-Carbon Strategy (NLCS)
     st.write(

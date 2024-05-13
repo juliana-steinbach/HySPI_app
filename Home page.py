@@ -29,12 +29,11 @@ def show():
     # Authors
     st.markdown("---")
     st.write("Authors of this data package:")
-    st.write("- Joanna Schlesinger (joanna.schlesinger@minesparis.psl.eu)")
-    st.write("- Romain Sacchi (romain.sacchi@psi.ch)")
     st.write("- Juliana Steinbach (juliana.steinbach@minesparis.psl.eu)")
+    st.write("- Joanna Schlesinger (joanna.schlesinger@minesparis.psl.eu)")
     st.write("- Thomas Beaussier (thomas.beaussier@minesparis.psl.eu)")
     st.write("- Paula Perez-Lopez (paula.perez_lopez@minesparis.psl.eu)")
-
+    st.write("- Romain Sacchi (romain.sacchi@psi.ch)")
 
 
 if __name__ == "__main__":
