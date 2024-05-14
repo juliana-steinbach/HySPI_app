@@ -1,5 +1,8 @@
 import lca_algebraic as agb
 from lca_algebraic import *
+import folium
+import pandas as pd
+from streamlit_folium import st_folium
 
 def show():
 
@@ -23,6 +26,47 @@ def show():
     transp = col3.selectbox("How is hydrogen going to be transported?", ["Pipeline", "Truck"], index=1)
     renewable_coupling = col1.selectbox("Will your plant include solar panels?", ["Yes", "No"], index=1)
     storage_choice = col2.selectbox("How is hydrogen going to be stored?", ["Tank", "No storage"], index=1)
+
+    if renewable_coupling == "Yes":
+        hours_year = 365 * 24
+        #"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat=45.256&lon=2.734&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=0&aspect=1&startyear=2005&endyear=2005&mountingplace=free&optimalinclination=0&optimalangles=0&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2005&hendyear=2005&trackingtype=0&hourlyangle=0&hourlyaspect=1&pvcalculation=1&pvtechchoice=crystSi&peakpower=1&loss=14"
+        import streamlit as st
+        import folium
+
+        # Initialize points if not already initialized
+        if "points" not in st.session_state:
+            st.session_state["points"] = []
+
+        # Create a base map centered at a specific location
+        m = folium.Map(location=[46.903354, 1.888334], zoom_start=6)
+
+        # Add markers to the map
+        for point in st.session_state["points"]:
+            folium.Marker(location=point, icon=folium.Icon(color='red')).add_to(m)
+
+        # Display the map
+        st.write(m)
+
+        # Function to handle click events on the map
+        def on_map_click(e):
+            if e.originalEvent:
+                lat, lon = e.latlng
+                point = (lat, lon)
+
+                if point not in st.session_state["points"]:
+                    st.session_state["points"].append(point)
+                    st.experimental_rerun()
+
+        # Register the click event handler
+        m.add_click_listener(on_map_click)
+
+        #hours_sun_y = col1.number_input("What is the average number of hours of sun per year in your region?", key="hours_sun_y_input")
+
+
+        #share_from_solar = int(hours_sun_y) / hours_year
+        #share_from_grid = 1 - share_from_solar
+        #col1.write(f"Share from solar: {share_from_solar:.2%}")
+        #col1.write(f"Share from grid: {share_from_grid:.2%}")
 
     #Help tooltips with data from IEA for stack and efficiency
     st.markdown("""
@@ -367,31 +411,7 @@ def show():
 
     Transformation_to_ind = agb.findBioAct("Transformation, to industrial area", categories=('natural resource', 'land'))
 
-    Lorry_E6: agb.findActivity("market for transport, freight, lorry >32 metric ton, EURO6", single=False, db_name=EI)
-
-
-    EF = 'EF v3.0 no LT'
-
-    climate = (EF, 'climate change no LT', 'global warming potential (GWP100) no LT')
-    m_resources = (EF, 'material resources: metals/minerals no LT',
-                   'abiotic depletion potential (ADP): elements (ultimate reserves) no LT')
-    land = (EF, 'land use no LT', 'soil quality index no LT')
-    water = (EF, 'water use no LT', 'user deprivation potential (deprivation-weighted water consumption) no LT')
-    acidification = (EF, 'acidification no LT', 'accumulated exceedance (AE) no LT')
-    marine_eutroph = (EF, 'eutrophication: marine no LT', 'fraction of nutrients reaching marine end compartment (N) no LT')
-    freshwater_eutroph = (EF, 'eutrophication: freshwater no LT', 'fraction of nutrients reaching freshwater end compartment (P) no LT')
-    terre_eutroph = (EF, 'eutrophication: terrestrial no LT', 'accumulated exceedance (AE) no LT')
-    radiation = (EF, 'ionising radiation: human health no LT', 'human exposure efficiency relative to u235 no LT')
-    non_renew = (EF, 'energy resources: non-renewable no LT', 'abiotic depletion potential (ADP): fossil fuels no LT')
-
-    # Test if the chosen impacts are impact cathegories
-    # bw.methods[climate]
-
-    # List of the impacts
-    impacts = [climate, m_resources, land, water, acidification, marine_eutroph, freshwater_eutroph, terre_eutroph,
-               radiation, non_renew]
-    # impacts
-
+    Lorry_E6= agb.findActivity("market for transport, freight, lorry >32 metric ton, EURO6", single=False, db_name=EI)
 
     tank = agb.findActivity(
         "high pressure storage tank production and maintenance, per 10kgH2 at 500bar, from grid electricity", single=False,
@@ -402,8 +422,25 @@ def show():
                        "unit",  # Unit
                        exchanges={})
 
+    #Method
+    EF = 'EF v3.0 no LT'
 
+    climate = (EF, 'climate change no LT', 'global warming potential (GWP100) no LT')
+    m_resources = (EF, 'material resources: metals/minerals no LT', 'abiotic depletion potential (ADP): elements (ultimate reserves) no LT')
+    land = (EF, 'land use no LT', 'soil quality index no LT')
+    water = (EF, 'water use no LT', 'user deprivation potential (deprivation-weighted water consumption) no LT')
+    acidification = (EF, 'acidification no LT', 'accumulated exceedance (AE) no LT')
+    marine_eutroph = (EF, 'eutrophication: marine no LT', 'fraction of nutrients reaching marine end compartment (N) no LT')
+    freshwater_eutroph = (EF, 'eutrophication: freshwater no LT', 'fraction of nutrients reaching freshwater end compartment (P) no LT')
+    terre_eutroph = (EF, 'eutrophication: terrestrial no LT', 'accumulated exceedance (AE) no LT')
+    radiation = (EF, 'ionising radiation: human health no LT', 'human exposure efficiency relative to u235 no LT')
+    non_renew = (EF, 'energy resources: non-renewable no LT', 'abiotic depletion potential (ADP): fossil fuels no LT')
 
+    # List of the impacts
+    impacts = [climate, m_resources, land, water, acidification, marine_eutroph, freshwater_eutroph, terre_eutroph,
+               radiation, non_renew]
+
+    #Electrolyzer selection:
     activity_names = {
         'PEM': {
             'Stack': 'electrolyzer production, 1MWe, PEM, Stack',
@@ -419,35 +456,24 @@ def show():
         }
     }
 
-
+    #negative act to convert negative itens in LCI table
     def negAct(act):
         """Correct the sign of some activities that are accounted as negative in brightway. """
         return agb.newActivity(USER_DB, act["name"] + "_neg", act["unit"], {
             act: -1,
         })
 
-
+    #activities from AEC/PEM database
     stack_activity = agb.findActivity(name=activity_names[stack_type]['Stack'], db_name='AEC/PEM')
     bop_activity = agb.findActivity(name=activity_names[stack_type]['BoP'], db_name='AEC/PEM')
     t_Stack_activity = negAct(agb.findActivity(name=activity_names[stack_type]['Treatment_Stack'], db_name='AEC/PEM'))
     t_BoP_activity = negAct(agb.findActivity(name=activity_names[stack_type]['Treatment_BoP'], db_name='AEC/PEM'))
 
+    #convert electrolyzer capacity to kW
     elec_cap = elec_cap_mw * 1000
 
-    #table reference to guide user
-    ref1_data = [
-        ["", "AEC", "", "PEM", ""],
-        ["", "Current,&nbsp;2019", "Future, 2050", "Current,&nbsp;2019", "Future, 2050"],
-        ["Stack lifetime (operating hours)", "60,000-90,000", "100,000-150,000", "30,000-90,000", "100,000-150,000"],
-    ]
-
-
-
     # BoP lifetime
-
     BoP_LT_h = BoP_LT_y * 365 * 24
-
-
 
     # capacity factor
     Electricity_consumed = BoP_LT_h * cf * elec_cap
@@ -460,14 +486,14 @@ def show():
     H2_produced = BoP_LT_h * cf * elec_cap * eff / HHV
     H2p = int(H2_produced)
     H2p_ton = H2p / 1000  # Convert kg to tons
-
     H2_per_hour = H2p / (BoP_LT_h * cf)
-
     Electricity_1kg = Electricity_consumed / H2_produced  # = HHV/eff
+
     E1 = round(Electricity_consumed / H2_produced, 2)
 
     n_stacks = BoP_LT_h / stack_LT
 
+    #electricity markets parameters
     param_electricity = agb.newEnumParam(
         "param_electricity",  # Short name
         label="electricity mix",  # English label
@@ -504,52 +530,6 @@ def show():
         "EFR2050RN2E": Elec_FR_2050_RN2E,
         "EFR2050RN03E": Elec_FR_2050_RN03E
     })
-
-    if renewable_coupling == "Yes":
-        hours_year = 365 * 24
-        #"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat=45.256&lon=2.734&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=0&aspect=1&startyear=2005&endyear=2005&mountingplace=free&optimalinclination=0&optimalangles=0&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2005&hendyear=2005&trackingtype=0&hourlyangle=0&hourlyaspect=1&pvcalculation=1&pvtechchoice=crystSi&peakpower=1&loss=14"
-        while True:
-            with col1:
-                import streamlit as st
-                import folium
-                from streamlit_folium import folium_static
-
-                # Initialize session state to store clicked points
-                if "clicked_points" not in st.session_state:
-                    st.session_state["clicked_points"] = ''
-
-                # Create a Folium map
-                m = folium.Map(location=[46.903354, 1.888334], zoom_start=5)
-
-                # Define a callback function to handle map clicks
-                def handle_click(lat, lon):
-                    st.session_state["clicked_points"].append({"lat": lat, "lon": lon})
-
-                # Add a click event handler to the map
-                folium.Marker(
-                    [46.903354, 1.888334],
-                    icon=folium.Icon(color="blue"),
-                    popup="Click me!",
-                    callback=handle_click
-                ).add_to(m)
-
-                # Display the map using the Streamlit-Folium component
-                folium_static(m)
-
-                # Display clicked points
-                if st.session_state["clicked_points"]:
-                    st.write("Clicked Points:")
-                    for point in st.session_state["clicked_points"]:
-                        st.write(point)
-
-            hours_sun_y = col1.number_input("What is the average number of hours of sun per year in your region?",
-                                          key="hours_sun_y_input")
-            break  # Exit the loop as number_input() already handles validation
-
-        share_from_solar = int(hours_sun_y) / hours_year
-        share_from_grid = 1 - share_from_solar
-        col1.write(f"Share from solar: {share_from_solar:.2%}")
-        col1.write(f"Share from grid: {share_from_grid:.2%}")
 
     def define_production():
         return agb.newActivity(USER_DB, "H2 production phase",

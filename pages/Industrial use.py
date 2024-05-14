@@ -103,7 +103,7 @@ def main():
 
 
         if city != st.session_state["selected_cities"]:
-            city_exists = any(c["city"] == city for c in st.session_state["selected_city"])#é aqui
+            city_exists = any(c["city"] == city for c in st.session_state["selected_cities"])#é aqui
             col2.write(f"You have selected '{city}', click the button below to confirm the selection")
             if col2.button("Confirm Selection"):
                 # Update session state variable if the button is clicked
