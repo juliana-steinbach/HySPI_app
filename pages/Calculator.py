@@ -32,33 +32,32 @@ def show():
         #"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat=45.256&lon=2.734&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=0&aspect=1&startyear=2005&endyear=2005&mountingplace=free&optimalinclination=0&optimalangles=0&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2005&hendyear=2005&trackingtype=0&hourlyangle=0&hourlyaspect=1&pvcalculation=1&pvtechchoice=crystSi&peakpower=1&loss=14"
         import streamlit as st
         import folium
+        from streamlit_folium import folium_static
 
-        # Initialize points if not already initialized
-        if "points" not in st.session_state:
-            st.session_state["points"] = []
+        if 'center' not in st.session_state:
+            st.session_state.center = [46.903354, 1.888334]
+        # Initialize session state to store clicked points
+        if 'location' not in st.session_state:
+            st.session_state.location = folium.Marker(st.session_state.center)
 
-        # Create a base map centered at a specific location
+        # Create a Folium map
         m = folium.Map(location=[46.903354, 1.888334], zoom_start=6)
 
-        # Add markers to the map
-        for point in st.session_state["points"]:
-            folium.Marker(location=point, icon=folium.Icon(color='red')).add_to(m)
 
-        # Display the map
-        st.write(m)
+        # When the user interacts with the map
+        map = st_folium(
+            m,
+            width=620, height=580,
+            key="folium_map"
+        )
 
-        # Function to handle click events on the map
-        def on_map_click(e):
-            if e.originalEvent:
-                lat, lon = e.latlng
-                point = (lat, lon)
+        if map["last_object_clicked"] != st.session_state.get("last_object_clicked"):
+            st.session_state["last_object_clicked"] = map["last_object_clicked"]
+            lat, lon = map["last_object_clicked"]["lat"], map["last_object_clicked"]["lng"]  # why lon doesnt work?
+            marker = folium.Marker(location=st.session_state.last_object_clicked)
+            marker.add_to(m)
 
-                if point not in st.session_state["points"]:
-                    st.session_state["points"].append(point)
-                    st.experimental_rerun()
 
-        # Register the click event handler
-        m.add_click_listener(on_map_click)
 
         #hours_sun_y = col1.number_input("What is the average number of hours of sun per year in your region?", key="hours_sun_y_input")
 
