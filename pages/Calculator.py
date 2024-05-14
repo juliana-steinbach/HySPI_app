@@ -13,16 +13,18 @@ def show():
 
     col1, col2, col3 = st.columns([1, 1, 1])
 
+    #Forefround questions
     stack_type = col1.selectbox("Select the electrolyzer stack:", ["PEM", "AEC"])
     elec_cap_mw = col2.number_input("Select the electrolyzer capacity (MW):", value=1, min_value=1, step=1)
     stack_LT = col3.number_input("Select the stack lifetime (h):", value=120000, min_value=1, step=1)
     BoP_LT_y = col1.number_input("Select the BoP lifetime (years):", value=20, min_value=1, step=1)
     eff = col2.number_input("Select the stack efficiency (0 to 1):", value=0.72, min_value=0.0, max_value=1.0, step=0.01)
     cf = col3.number_input("Select the capacity factor (0 to 1):", value=0.9, min_value=0.01, step=0.05)
-    transp = col3.selectbox("How is hydrogen going to be stored?", ["Pipeline", "Truck"], index=1)
+    transp = col3.selectbox("How is hydrogen going to be transported?", ["Pipeline", "Truck"], index=1)
     renewable_coupling = col1.selectbox("Will your plant include solar panels?", ["Yes", "No"], index=1)
     storage_choice = col2.selectbox("How is hydrogen going to be stored?", ["Tank", "No storage"], index=1)
 
+    #Help tooltips with data from IEA for stack and efficiency
     st.markdown("""
             <style>
                 /* Importando o CSS do Font Awesome */
@@ -30,7 +32,6 @@ def show():
             </style>
         """, unsafe_allow_html=True)
 
-    # Define the HTML content for the tooltip
     tooltip_html = """
             <div class="tooltip">
                 <span class="tooltiptext">
@@ -102,10 +103,6 @@ def show():
         </style>
         """
 
-    # Add JavaScript and CSS to the page
-    st.markdown(js_code, unsafe_allow_html=True)
-    st.markdown(css_code, unsafe_allow_html=True)
-
     # Define the HTML content for the tooltip
     tooltip_html2 = """
             <div class="tooltip">
@@ -125,7 +122,7 @@ def show():
                     </table>
                     <p>source: IEA, The Future of Hydrogen - Seizing today’s opportunities, International Energy Agency, 2019.</p>
                 </span>
-                <span id="tooltip_trigger">Need help with prospective Electrical efficiency data? Check this info  <i class="fas fa-lightbulb"></i></span>
+                <span id="tooltip_trigger">Need help with prospective Stack efficiency data? Check this info  <i class="fas fa-lightbulb"></i></span>
             </div>
         """
 
@@ -181,6 +178,117 @@ def show():
     # Add JavaScript and CSS to the page
     st.markdown(js_code, unsafe_allow_html=True)
     st.markdown(css_code, unsafe_allow_html=True)
+
+    #Indication for background before the data
+    st.write("## Background")
+    st.markdown("---")
+
+    col4, col5, col6, col7 = st.columns([1.2, 1.2, 1.2, 1.2])
+
+    demand_scenario = col4.radio("**Demand Scenarios**",options=["Reference", "Sobriety", "Reindustrialization"],key="demand_scenario")
+    production_scenario = col5.radio("**Production Scenarios**",options=["M0", "M1", "M23", "N1", "N2", "N03"],key="production_scenario", horizontal=True)
+    imports_market_group = col6.radio("**Imports market group**",options=["Western European Union (WEU)", "Neighbouring"], key="imports_market_group")
+    iam_applied = col7.radio("**IAM applied**",options=["SSP2-Base", "SSP2-26", "SSP2-19", "None"], key="iam_applied")
+
+    choice=None
+    if demand_scenario == "Reference":
+        if production_scenario == "M0":
+            if imports_market_group == "Western European Union (WEU)":
+                if iam_applied == "SSP2-Base":
+                    choice = "EFR2050BRM0"
+                elif iam_applied == "SSP2-26":
+                    choice = "EFR2050R26RM0"
+                elif iam_applied == "SSP2-19":
+                    choice = "EFR2050R19RM0"
+                elif iam_applied == "None":
+                    st.write("Demand modelling in progress, not currently available")
+            else:
+                if iam_applied == "None":
+                    choice = "EFR2050RM1E"
+                else:
+                    st.write("Demand modelling in progress, not currently available")
+        elif production_scenario == "M1":
+            if imports_market_group == "Western European Union (WEU)":
+                if iam_applied == "SSP2-Base":
+                    choice = "EFR2050BRM1"
+                elif iam_applied == "SSP2-26":
+                    choice = "EFR2050R26RM1"
+                elif iam_applied == "SSP2-19":
+                    choice = "EFR2050R19RM1"
+                elif iam_applied == "None":
+                    st.write("Demand modelling in progress, not currently available")
+            else:
+                if iam_applied == "None":
+                    choice = "EFR2050RM1E"
+                else:
+                    st.write("Demand modelling in progress, not currently available")
+        elif production_scenario == "M23":
+            if imports_market_group == "Western European Union (WEU)":
+                if iam_applied == "SSP2-Base":
+                    choice = "EFR2050BRM23"
+                elif iam_applied == "SSP2-26":
+                    choice = "EFR2050R26RM23"
+                elif iam_applied == "SSP2-19":
+                    choice = "EFR2050R19RM23"
+                elif iam_applied == "None":
+                    st.write("Demand modelling in progress, not currently available")
+            else:
+                if iam_applied == "None":
+                    choice = "EFR2050RM23E"
+                else:
+                    st.write("Demand modelling in progress, not currently available")
+        elif production_scenario == "N1":
+            if imports_market_group == "Western European Union (WEU)":
+                if iam_applied == "SSP2-Base":
+                    choice = "EFR2050BRN1"
+                elif iam_applied == "SSP2-26":
+                    choice = "EFR2050R26RN1"
+                elif iam_applied == "SSP2-19":
+                    choice = "EFR2050R19RN1"
+                elif iam_applied == "None":
+                    st.write("Demand modelling in progress, not currently available")
+            else:
+                if iam_applied == "None":
+                    choice = "EFR2050RN01E"
+                else:
+                    st.write("Demand modelling in progress, not currently available")
+        elif production_scenario == "N2":
+            if imports_market_group == "Western European Union (WEU)":
+                if iam_applied == "SSP2-Base":
+                    choice = "EFR2050BRN2"
+                elif iam_applied == "SSP2-26":
+                    choice = "EFR2050R26RN2"
+                elif iam_applied == "SSP2-19":
+                    choice = "EFR2050R19RN2"
+                elif iam_applied == "None":
+                    st.write("Demand modelling in progress, not currently available")
+            else:
+                if iam_applied == "None":
+                    choice = "EFR2050RN01E"
+                else:
+                    st.write("Demand modelling in progress, not currently available")
+        elif production_scenario == "N03":
+            if imports_market_group == "Western European Union (WEU)":
+                if iam_applied == "SSP2-Base":
+                    choice = "EFR2050BRN03"
+                elif iam_applied == "SSP2-26":
+                    choice = "EFR2050R26RN03"
+                elif iam_applied == "SSP2-19":
+                    choice = "EFR2050R19RN03"
+                elif iam_applied == "None":
+                    st.write("Demand modelling in progress, not currently available")
+            else:
+                if iam_applied == "None":
+                    choice = "EFR2050RN03E"
+                else:
+                    st.write("Demand modelling in progress, not currently available")
+    else:
+        st.write("Demand modelling in progress, not currently available")
+
+    if st.button("Compute result"):
+        choice2=choice
+    else:
+        st.stop()
 
     #project start:
     agb.initProject('HySPI_scenarios')
@@ -243,11 +351,10 @@ def show():
     E_RTE = ["EFR2050RM0E", "EFR2050RM1E", "EFR2050RM23E", "EFR2050RN1E", "EFR2050RN2E", "EFR2050RN03E"]
     options = ["EFR2023", "EDE2023", "PV"]+base+R19+R26+E_RTE
 
-    st.write("## Background")
-
+    #Results indication before code
     st.markdown("---")
-
-    choice = st.selectbox("Select the future electricity scenario:", options) #index=3)
+    st.markdown("## Results")
+    st.markdown("#### Hydrogen Impact")
 
     water_H2 = agb.findBioAct("Water, unspecified natural origin", categories=('natural resource', 'in ground'))
 
@@ -527,7 +634,7 @@ def show():
 
 
     def define_system():
-        return agb.newActivity(USER_DB, name=choice,
+        return agb.newActivity(USER_DB, name=choice2,
                                unit="kg",
                                exchanges={
                                    production: 1,
@@ -542,7 +649,7 @@ def show():
     result_table_H2 = agb.multiLCAAlgebric(
         system,
         impacts,
-        param_electricity=choice
+        param_electricity=choice2
     )
 
     header_mapping = {
@@ -566,10 +673,6 @@ def show():
          {"selector": "td", "props": [("max-width", "100px")]}]
     )
 
-    st.markdown("---")
-    st.markdown("## Results")
-    st.markdown("#### Hydrogen Impact")
-
     # Display the styled DataFrame table
     st.table(result_table_H2_styled)
 
@@ -590,7 +693,7 @@ def show():
 
     st.table(agb.exploreImpacts(impacts[0],
                        system,
-                                param_electricity=choice
+                                param_electricity=choice2
                        ))
 
     #consequential
@@ -612,7 +715,7 @@ def show():
     result_table_ammonia = agb.multiLCAAlgebric(
         ammonia,
         impacts,
-        param_electricity=choice
+        param_electricity=choice2
     )
 
     def define_Ammonia_smr():
@@ -625,7 +728,7 @@ def show():
     result_table_ammonia_smr = agb.multiLCAAlgebric(
         Ammonia_smr,
         impacts,
-        param_electricity=choice
+        param_electricity=choice2
     )
 
     first_element = result_table_ammonia.iloc[0, 0]  # Assuming it's a DataFrame

@@ -4,13 +4,15 @@ import folium
 import pandas as pd
 import streamlit as st
 from streamlit_folium import st_folium
-#from pages.Calculator import calculate_result
 
+if "first_element_ammonia" not in st.session_state or st.session_state.first_element_ammonia is None:
+    st.write("To apply hydrogen in its industrial use, please select the parameters in Calculator and compute the result")
+    st.stop()
 
 p = Path(__file__).parent / "iconsequential.csv"
 INDUSTRY_DATA = pd.read_csv(p)
 
-st.set_page_config(layout="wide")
+st.set_page_config(layout="wide") #initial_sidebar_state='collapsed'
 
 def get_city_from_lat_lon(lat: float, lon: float) -> str:
     city_row = INDUSTRY_DATA[
@@ -26,7 +28,7 @@ def get_production(city: str) -> int:
 def main():
     st.write("# Industrial Hydrogen")
     if "selected_cities" not in st.session_state:
-        st.session_state["selected_cities"] = []#if I substitute this for ' ' the list does not get created
+        st.session_state["selected_cities"] = [] #if I substitute this for ' ' the list does not get created
 
     if "selected_city" not in st.session_state:
         st.session_state["selected_city"] = []
@@ -34,10 +36,11 @@ def main():
     cities = INDUSTRY_DATA.groupby(["city", "latitude", "longitude"])
 
     # Create a layout with two columns
-    col1, col2 = st.columns([2, 2])
+    col1, col2, col3 = st.columns([3, 2, 2])
 
-    col1.write("## GHG and production data")
-    col2.write("## Selected Cities")
+    col1.write("### Ammonia production sites")
+    col2.write("### Selected Cities")
+    col3.write("### CO2 data")
 
 
     # Calculate total ammonia production in France
@@ -53,13 +56,10 @@ def main():
     difference=co2_impact_smr - co2_impact_hydrogen
 
     total_production = sum(city_info['production'] for city_info in st.session_state["selected_cities"])
-    col1.write(f"Total Ammonia Production in France: {total_production}")
-    col1.write(f"Total CO2 impact produced using SMR: {co2_impact_smr}")
-    col1.write(f"Total CO2 impact produced using hydrogen: {co2_impact_hydrogen}")
 
-    with st.container():
+    with col1.container():
         # Create the map
-        m = folium.Map(location=[46.903354, 1.888334], zoom_start=5)
+        m = folium.Map(location=[46.903354, 2.188334], zoom_start=5)
 
         for (city, lat, lon), group in cities:
             custom1_icon = folium.features.CustomIcon(
@@ -85,6 +85,16 @@ def main():
             width=400, height=350
         )
 
+    total_production_tons = total_production / 1000
+    co2_impact_smr_tons = co2_impact_smr / 1000
+    co2_impact_hydrogen_tons = co2_impact_hydrogen / 1000
+    difference_tons = difference / 1000
+
+    col3.write(f"Total Ammonia Production in France: {total_production_tons} tons")
+    col3.write(f"Total CO2 impact produced using SMR: {co2_impact_smr_tons} tons of CO2")
+    col3.write(f"Total CO2 impact produced using hydrogen: {co2_impact_hydrogen_tons} tons of CO2")
+    col3.write(f'Electrolysis can save {difference_tons} tons of CO2 per year in the Ammonia sector')
+
     col2.write("Select an Ammonia plant to substitute SMR with Electrolysis")
     if map["last_object_clicked"] != st.session_state.get("last_object_clicked"):
         st.session_state["last_object_clicked"] = map["last_object_clicked"]
@@ -93,7 +103,7 @@ def main():
 
 
         if city != st.session_state["selected_cities"]:
-            city_exists = any(c["city"] == city for c in st.session_state["selected_cities"])#é aqui
+            city_exists = any(c["city"] == city for c in st.session_state["selected_city"])#é aqui
             col2.write(f"You have selected '{city}', click the button below to confirm the selection")
             if col2.button("Confirm Selection"):
                 # Update session state variable if the button is clicked
@@ -105,7 +115,8 @@ def main():
 
     for city_info in st.session_state["selected_cities"]:
         col2.write(f"- City: {city_info['city']}, Production: {city_info['production']}")
-    col1.write(f'Electrolysis can save {difference} kg of CO2 in the Ammonia sector')
+
+
 
 
 if __name__ == "__main__":
