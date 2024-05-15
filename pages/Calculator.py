@@ -28,44 +28,47 @@ def show():
     storage_choice = col2.selectbox("How is hydrogen going to be stored?", ["Tank", "No storage"], index=1)
 
     if renewable_coupling == "Yes":
-        hours_year = 365 * 24
-        #"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat=45.256&lon=2.734&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=0&aspect=1&startyear=2005&endyear=2005&mountingplace=free&optimalinclination=0&optimalangles=0&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2005&hendyear=2005&trackingtype=0&hourlyangle=0&hourlyaspect=1&pvcalculation=1&pvtechchoice=crystSi&peakpower=1&loss=14"
-        import streamlit as st
-        import folium
-        from streamlit_folium import folium_static
+        with st.container():
+            col1, col2 = st.columns([2, 1])
+            col1.write("### Pick a location on the map")
+            hours_year = 365 * 24
 
-        if 'center' not in st.session_state:
-            st.session_state.center = [46.903354, 1.888334]
-        # Initialize session state to store clicked points
-        if 'location' not in st.session_state:
-            st.session_state.location = folium.Marker(st.session_state.center)
+            with col1:
+                def get_pos(lat, lng):
+                    return lat, lng
 
-        # Create a Folium map
-        m = folium.Map(location=[46.903354, 1.888334], zoom_start=6)
+                if 'markers1' not in st.session_state:
+                    st.session_state.markers1 = []
+                if 'markers2' not in st.session_state:
+                    st.session_state.markers2 = []
+                # Create a Folium map
+                m = folium.Map(location=[46.903354, 2.088334], zoom_start=6)
+                m.add_child(folium.LatLngPopup())
+
+                # When the user interacts with the map
+                map = st_folium(
+                    m,
+                    width=600, height=620,
+                    key="folium_map"
+                )
+                data = None
+                if map.get("last_clicked"):
+                    data = get_pos(map["last_clicked"]["lat"], map["last_clicked"]["lng"])
+
+                if data is not None:
+                    #https://re.jrc.ec.europa.eu/pvg_tools/en/    hourly data
+                    #"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat=45.256&lon=2.734&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=0&aspect=1&startyear=2005&endyear=2005&mountingplace=free&optimalinclination=0&optimalangles=0&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2005&hendyear=2005&trackingtype=0&hourlyangle=0&hourlyaspect=1&pvcalculation=1&pvtechchoice=crystSi&peakpower=1&loss=14"
+                    url=f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat={data[0]}&lon={data[1]}&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=0&aspect=1&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=0&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyangle=0&hourlyaspect=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={elec_cap_mw * 1.3}&loss=14"
+                    df = pd.read_csv(url)
 
 
-        # When the user interacts with the map
-        map = st_folium(
-            m,
-            width=620, height=580,
-            key="folium_map"
-        )
+                    st.write(df)
 
-        if map["last_object_clicked"] != st.session_state.get("last_object_clicked"):
-            st.session_state["last_object_clicked"] = map["last_object_clicked"]
-            lat, lon = map["last_object_clicked"]["lat"], map["last_object_clicked"]["lng"]  # why lon doesnt work?
-            marker = folium.Marker(location=st.session_state.last_object_clicked)
-            marker.add_to(m)
-
-
-
-        #hours_sun_y = col1.number_input("What is the average number of hours of sun per year in your region?", key="hours_sun_y_input")
-
-
-        #share_from_solar = int(hours_sun_y) / hours_year
-        #share_from_grid = 1 - share_from_solar
-        #col1.write(f"Share from solar: {share_from_solar:.2%}")
-        #col1.write(f"Share from grid: {share_from_grid:.2%}")
+                #hours_sun_y = col1.number_input("What is the average number of hours of sun per year in your region?", key="hours_sun_y_input")
+                #share_from_solar = int(hours_sun_y) / hours_year
+                #share_from_grid = 1 - share_from_solar
+                #col1.write(f"Share from solar: {share_from_solar:.2%}")
+                #col1.write(f"Share from grid: {share_from_grid:.2%}")
 
     #Help tooltips with data from IEA for stack and efficiency
     st.markdown("""
