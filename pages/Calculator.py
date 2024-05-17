@@ -3,10 +3,14 @@ from lca_algebraic import *
 import folium
 import pandas as pd
 from streamlit_folium import st_folium
+from urllib.request import urlopen
+from tempfile import NamedTemporaryFile
 
 def show():
 
     import streamlit as st
+    from urllib.request import urlopen
+    from tempfile import NamedTemporaryFile
 
     st.set_page_config(layout="wide")
 
@@ -27,6 +31,8 @@ def show():
     transp = col3.selectbox("How is hydrogen going to be transported?", ["Pipeline", "Truck"], index=1)
     renewable_coupling = col1.selectbox("Will your plant include solar panels?", ["Yes", "No"], index=1)
     storage_choice = col2.selectbox("How is hydrogen going to be stored?", ["Tank", "No storage"], index=1)
+
+    data = None  # Initialize data with a default value
 
     if renewable_coupling == "Yes":
         with st.container():
@@ -52,24 +58,70 @@ def show():
                     width=600, height=620,
                     key="folium_map"
                 )
-                data = None
                 if map.get("last_clicked"):
                     data = get_pos(map["last_clicked"]["lat"], map["last_clicked"]["lng"])
 
-                if data is not None:
-                    #https://re.jrc.ec.europa.eu/pvg_tools/en/    hourly data
-                    #"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat=45.256&lon=2.734&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=0&aspect=1&startyear=2005&endyear=2005&mountingplace=free&optimalinclination=0&optimalangles=0&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2005&hendyear=2005&trackingtype=0&hourlyangle=0&hourlyaspect=1&pvcalculation=1&pvtechchoice=crystSi&peakpower=1&loss=14"
-                    url=f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat={data[0]}&lon={data[1]}&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=0&aspect=1&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=0&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyangle=0&hourlyaspect=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={elec_cap_mw * 1.3}&loss=14"
-                    df = pd.read_csv(url)
+    if data is not None:
+        #https: // re.jrc.ec.europa.eu / api / v5_2 / seriescalc?lat = 43.667 & lon = 5.596 & raddatabase = PVGIS - SARAH2 & browser = 1 & outputformat = csv & userhorizon = & usehorizon = 1 & angle = & aspect = & startyear = 2020 & endyear = 2020 & mountingplace = free & optimalinclination = 0 & optimalangles = 1 & js = 1 & select_database_hourly = PVGIS - SARAH2 & hstartyear = 2020 & hendyear = 2020 & trackingtype = 0 & hourlyoptimalangles = 1 & pvcalculation = 1 & pvtechchoice = crystSi & peakpower = 1300 & loss = 14 & components = 1
+        #https://re.jrc.ec.europa.eu/pvg_tools/en/    hourly data
+        #"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat=45.256&lon=2.734&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=0&aspect=1&startyear=2005&endyear=2005&mountingplace=free&optimalinclination=0&optimalangles=0&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2005&hendyear=2005&trackingtype=0&hourlyangle=0&hourlyaspect=1&pvcalculation=1&pvtechchoice=crystSi&peakpower=1&loss=14"
+        #URL=f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat={data[0]}&lon={data[1]}&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={elec_cap_mw * 1.3}&loss=14"
+        URL = "https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat=43.667&lon=5.596&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower=1300&loss=14&components=1"
 
+        # Create a temporary file to save the CSV data
+        o = NamedTemporaryFile(suffix=".csv", delete=False)
 
-                    st.write(df)
+        # Download the CSV data
+        r = urlopen(URL)
+        o.write(r.read())
+        o.close()
 
-                #hours_sun_y = col1.number_input("What is the average number of hours of sun per year in your region?", key="hours_sun_y_input")
-                #share_from_solar = int(hours_sun_y) / hours_year
-                #share_from_grid = 1 - share_from_solar
-                #col1.write(f"Share from solar: {share_from_solar:.2%}")
-                #col1.write(f"Share from grid: {share_from_grid:.2%}")
+        # Initialize variables
+        data2 = []
+        start_line = 12  # Line to start reading the actual data
+        header = ["DateTime", "elec_W"]
+
+        # Read the CSV file starting from the 12th line
+        with open(o.name, 'r') as file:
+            for i, line in enumerate(file):
+                if i >= start_line:
+                    # Stop reading if an empty line is encountered
+                    if line.strip() == "":
+                        break
+                    # Split the line by commas and select only the first and second columns
+                    columns = line.strip().split(',')
+                    if len(columns) >= 2:
+                        data2.append([columns[0], columns[1]])
+
+        # Create a DataFrame from the data and name the columns
+        df = pd.DataFrame(data2, columns=header)
+
+        # Convert 'elec_W' column to numeric, handling possible conversion issues
+        df['elec_W'] = pd.to_numeric(df['elec_W'], errors='coerce')
+
+        # Display the first few rows of the DataFrame
+        # print(df.head())
+        # print(df)
+        # print(df.iloc[:20, :])
+
+        # Define the threshold (10% of 1,000,000)
+        threshold = 0.05 * 1000000
+
+        # Sum of all elec_W figures
+        total_sum = df['elec_W'].sum()
+
+        # Sum of elec_W figures excluding values smaller than the threshold
+        filtered_sum = df[df['elec_W'] >= threshold]['elec_W'].sum()
+
+        real_power_pv = (total_sum) / 1000  # convert to kw
+        hours_year = 366 * 24  # 2020 has 366 days
+        necessary_power = 1000 * hours_year  # kwh
+        grid = necessary_power - real_power_pv
+
+        percentage_grid = grid / necessary_power
+        percentage_pv=1-percentage_grid
+
+        col2.write(f"percentage from grid: {percentage_grid}, percentage from PV: {percentage_pv}")
 
     #Help tooltips with data from IEA for stack and efficiency
     st.markdown("""
@@ -333,8 +385,15 @@ def show():
     else:
         st.write("Demand modelling in progress, not currently available")
 
-    if st.button("Compute result"):
+
+    if data is not None and st.button("Compute result"):
         choice2=choice
+
+    elif data is None and st.button("Compute result"):
+        choice2=choice
+        percentage_pv=0
+        percentage_grid=1
+
     else:
         st.stop()
 
@@ -541,7 +600,8 @@ def show():
         return agb.newActivity(USER_DB, "H2 production phase",
                                unit="unit",
                                exchanges={
-                                   electricity: Electricity_1kg,
+                                   electricity: Electricity_1kg*percentage_grid,
+                                   PV_coupled:Electricity_1kg*percentage_pv,
                                    water_H2: 0.0014,
                                    Oxygen: -8
                                })
@@ -654,18 +714,9 @@ def show():
     # Rename the columns in the result table using the mapping
     result_table_H2.rename(columns=header_mapping, inplace=True)
 
-    first_column = result_table_H2.iloc[0, 0]  # First column value
-    header_and_values = result_table_H2.iloc[0, 1:]  # Header and values for each column
-
-    # Or if you want to extract all values into a list
-    values_list = result_table_H2.iloc[0, 1:].tolist()
-
-    # Or if you want to extract the header names and corresponding values into a dictionary
-    header_values_dict = dict(zip(result_table_H2.columns[0:], values_list))
-
-    st.write("")
-    for header, value in header_values_dict.items():
-        st.write(f"{header}: {value:.2e}")
+    for index, row in result_table_H2.iterrows():
+        for column_name, value in row.items():
+            st.write(f"{column_name}: {value:.2e}")
 
     with st.container():
         paragraph = (
@@ -680,10 +731,16 @@ def show():
 
     st.markdown("---")
 
+    st.table(result_table_H2)
+
     st.table(agb.exploreImpacts(impacts[0],
                        system,
                                 param_electricity=choice2
                        ))
+    st.table(agb.exploreImpacts(impacts[0],
+                                production,
+                                param_electricity=choice2
+                                ))
 
     #Industrial use
 
