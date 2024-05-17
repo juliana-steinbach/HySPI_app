@@ -26,21 +26,28 @@ def get_production(city: str) -> int:
 
 
 def main():
+
     st.write("# Industrial Hydrogen")
+
     if "selected_cities" not in st.session_state:
         st.session_state["selected_cities"] = [] #if I substitute this for ' ' the list does not get created
-
-    if "selected_city" not in st.session_state:
-        st.session_state["selected_city"] = []
 
     cities = INDUSTRY_DATA.groupby(["city", "latitude", "longitude"])
 
     # Create a layout with two columns
     col1, col2, col3 = st.columns([3, 2, 2])
 
-    col1.write("### Ammonia production sites")
-    col2.write("### Selected Cities")
-    col3.write("### CO2 data")
+    with col1.container():
+        paragraph = ("### Ammonia plants")
+        col1.info(paragraph)
+    col1.write("Click on the ammonia plants to switch from SMR H2 to electrolysis H2")
+    with col2.container():
+        paragraph = ("### Selected Cities")
+        col2.info(paragraph)
+    with col3.container():
+        paragraph = ("### CO2 data")
+        col3.info(paragraph)
+
 
 
     # Calculate total ammonia production in France
@@ -55,14 +62,12 @@ def main():
     co2_impact_smr = int(total_production * co2_impact_ammonia_smr)
     difference=co2_impact_smr - co2_impact_hydrogen
 
-    total_production = sum(city_info['production'] for city_info in st.session_state["selected_cities"])
-
     with col1.container():
         # Create the map
         m = folium.Map(location=[46.903354, 2.188334], zoom_start=5)
 
         for (city, lat, lon), group in cities:
-            custom1_icon = folium.features.CustomIcon(
+            custom1_icon = folium.features.CustomIcon(  #custom1 is the ammonia sign with hydrogen
                 'https://i.ibb.co/3419K9D/ammonia-H-removebg-preview.png',  # URL of your custom icon image
                 icon_size=(40, 40),  # Size of the icon image (width, height)
                 icon_anchor=(15, 15),  # Anchor point of the icon (relative to its top-left corner)
@@ -95,15 +100,13 @@ def main():
     col3.write(f"Total CO2 impact produced using hydrogen: {co2_impact_hydrogen_tons} tons of CO2")
     col3.write(f'Electrolysis can save {difference_tons} tons of CO2 per year in the Ammonia sector')
 
-    col2.write("Select an Ammonia plant to substitute SMR with Electrolysis")
     if map["last_object_clicked"] != st.session_state.get("last_object_clicked"):
         st.session_state["last_object_clicked"] = map["last_object_clicked"]
-        lat, lon = map["last_object_clicked"]["lat"], map["last_object_clicked"]["lng"] #why lon doesnt work?
+        lat, lon = map["last_object_clicked"]["lat"], map["last_object_clicked"]["lng"]  # why lon doesnt work?
         city = get_city_from_lat_lon(lat, lon)
 
-
         if city != st.session_state["selected_cities"]:
-            city_exists = any(c["city"] == city for c in st.session_state["selected_cities"])#é aqui
+            city_exists = any(c["city"] == city for c in st.session_state["selected_cities"])#or city_exists = any(city_info["city"] == city for city_info in st.session_state["selected_cities"])
             col2.write(f"You have selected '{city}', click the button below to confirm the selection")
             if col2.button("Confirm Selection"):
                 # Update session state variable if the button is clicked
@@ -116,7 +119,10 @@ def main():
     for city_info in st.session_state["selected_cities"]:
         col2.write(f"- City: {city_info['city']}, Production: {city_info['production']}")
 
+    st.write("# Ammonia production")
 
+    ammonia_schema=('ammonia smr.png')
+    st.image(ammonia_schema, caption='', )
 
 
 if __name__ == "__main__":

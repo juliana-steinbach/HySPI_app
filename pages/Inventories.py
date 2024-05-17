@@ -84,7 +84,6 @@ df = extract_data('electrolyzers_LCI.xlsx', 'M1-2', item_name, columns, column_n
 expander.table(df)
 
 expander = st.expander("Balance of Plant for PEM")
-#inserting table from excel
 item_name = "electrolyzer production, 1MWe, PEM, Balance of Plant"
 column_names = ["Name", "Amount", "Location", "Unit", "Type"]
 columns = [0, 1, 2, 3, 5]
@@ -97,6 +96,21 @@ column_names = ["Name", "Amount", "Unit", "Category", "Type"]
 columns = [0, 1, 3, 4, 5]
 df = extract_data('electrolyzers_LCI.xlsx', 'M1-2', item_name, columns, column_names)
 expander.table(df)
+
+expander = st.expander("treatment of fuel cell stack PEM")
+item_name = "treatment of fuel cell stack, 1MWe, PEM"
+column_names = ["Name", "Amount", "Location", "Unit", "Type"]
+columns = [0, 1, 2, 3, 5]
+df = extract_data('electrolyzers_LCI.xlsx', 'M1-2', item_name, columns, column_names)
+expander.table(df)
+
+expander = st.expander("treatment of balance of plant for PEM")
+item_name = "treatment of fuel cell balance of plant, 1MWe, PEM"
+column_names = ["Name", "Amount", "Location", "Unit", "Type"]
+columns = [0, 1, 2, 3, 5]
+df = extract_data('electrolyzers_LCI.xlsx', 'M1-2', item_name, columns, column_names)
+expander.table(df)
+
 
 st.markdown("---")
 
@@ -123,6 +137,27 @@ expander = st.expander("Balance of Plant for AEC")
 item_name = "electrolyzer production, 1MWe, AEC, Balance of Plant"
 column_names = ["Name", "Amount", "Location", "Unit", "Type"]
 columns = [0, 1, 2, 3, 5]
+df = extract_data('electrolyzers_LCI.xlsx', 'M1-2', item_name, columns, column_names)
+expander.table(df)
+
+expander = st.expander("treatment of fuel cell stack AEC")
+item_name = "treatment of fuel cell stack, 1MWe, AEC"
+column_names = ["Name", "Amount", "Location", "Unit", "Type"]
+columns = [0, 1, 2, 3, 5]
+df = extract_data('electrolyzers_LCI.xlsx', 'M1-2', item_name, columns, column_names)
+expander.table(df)
+
+expander = st.expander("treatment of balance of plant for AEC")
+item_name = "treatment of fuel cell balance of plant, 1MWe, AEC"
+column_names = ["Name", "Amount", "Location", "Unit", "Type"]
+columns = [0, 1, 2, 3, 5]
+df = extract_data('electrolyzers_LCI.xlsx', 'M1-2', item_name, columns, column_names)
+expander.table(df)
+
+expander = st.expander("Ammonia from SMR")
+item_name = "ammonia production, steam reforming, liquid"
+column_names = ["Name", "Amount", "Location", "Unit", "Category", "Type"]
+columns = [0, 1, 2, 3, 4, 5]
 df = extract_data('electrolyzers_LCI.xlsx', 'M1-2', item_name, columns, column_names)
 expander.table(df)
 

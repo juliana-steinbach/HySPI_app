@@ -11,8 +11,9 @@ def show():
     st.set_page_config(layout="wide")
 
     st.title("HySPI Hydrogen Impact Calculator")
-    st.write("## Foreground")
     st.markdown("---")
+    st.write("## Foreground")
+
 
     col1, col2, col3 = st.columns([1, 1, 1])
 
@@ -226,8 +227,9 @@ def show():
     st.markdown(css_code, unsafe_allow_html=True)
 
     #Indication for background before the data
-    st.write("## Background")
     st.markdown("---")
+    st.write("## Background")
+
 
     col4, col5, col6, col7 = st.columns([1.2, 1.2, 1.2, 1.2])
 
@@ -340,7 +342,7 @@ def show():
     agb.initProject('HySPI_scenarios')
 
     USER_DB = 'user-db'
-    EI = 'ecoinvent 3.9.1 cutoff'
+    EI = 'ei_3.9.1'
     agb.resetDb(USER_DB)
     agb.resetParams()
     B50RM0 = 'ecoinvent_cutoff_3.9_image_SSP2-Base_2050_RM0_2.1'
@@ -400,7 +402,9 @@ def show():
     #Results indication before code
     st.markdown("---")
     st.markdown("## Results")
-    st.markdown("#### Hydrogen Impact")
+    st.markdown("#### Hydrogen Environmental Impact")
+    st.markdown("###### Functional unit: 1kg of Hydrogen produced")#verify the option to switch fu
+    st.markdown("###### Method: EF v3.0 no LT")
 
     water_H2 = agb.findBioAct("Water, unspecified natural origin", categories=('natural resource', 'in ground'))
 
@@ -650,15 +654,18 @@ def show():
     # Rename the columns in the result table using the mapping
     result_table_H2.rename(columns=header_mapping, inplace=True)
 
-    result_table_H2_styled = result_table_H2.style.set_table_styles(
-        [{"selector": "th", "props": [("max-width", "100px")]},
-         {"selector": "td", "props": [("max-width", "100px")]}]
-    )
+    first_column = result_table_H2.iloc[0, 0]  # First column value
+    header_and_values = result_table_H2.iloc[0, 1:]  # Header and values for each column
 
-    # Display the styled DataFrame table
-    st.table(result_table_H2_styled)
+    # Or if you want to extract all values into a list
+    values_list = result_table_H2.iloc[0, 1:].tolist()
 
+    # Or if you want to extract the header names and corresponding values into a dictionary
+    header_values_dict = dict(zip(result_table_H2.columns[0:], values_list))
 
+    st.write("")
+    for header, value in header_values_dict.items():
+        st.write(f"{header}: {value:.2e}")
 
     with st.container():
         paragraph = (
@@ -678,10 +685,10 @@ def show():
                                 param_electricity=choice2
                        ))
 
-    #consequential
+    #Industrial use
 
     a_infra = agb.findActivity("market for chemical factory, organics", loc='GLO', db_name=EI)
-    ammonia_smr = agb.findActivity("market for ammonia, anhydrous, liquid", loc='RER', db_name=EI)
+    ammonia_smr = agb.findActivity("ammonia production, steam reforming, liquid", loc='FR', db_name=EI)
     def define_ammonia():
         return agb.newActivity(USER_DB, name="Ammonia production",
                                unit="unit",
@@ -724,14 +731,3 @@ def show():
 
 if __name__ == "__main__":
     show()
-
-
-
-
-
-
-
-
-
-
-
