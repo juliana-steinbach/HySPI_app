@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import io
+from streamlit_extras.colored_header import colored_header
 
 #function to extract table from inventory and disply in page
 
@@ -31,10 +32,13 @@ def extract_data(filename, sheet_name, item_name, columns, column_names):
     return df_final
 
 #Page content
+st.set_page_config(layout="wide")
 st.markdown("# Life Cycle Inventory - LCI")
-st.markdown("### Foreground activities")
-
-st.markdown("---")
+colored_header(
+    label="Foreground activities",
+    description="",
+    color_name="blue-70",
+)
 
 
 st.write('''The Life Cycle Assessment of hydrogen production is comprised of activities in the 
@@ -153,6 +157,12 @@ column_names = ["Name", "Amount", "Location", "Unit", "Type"]
 columns = [0, 1, 2, 3, 5]
 df = extract_data('electrolyzers_LCI.xlsx', 'M1-2', item_name, columns, column_names)
 expander.table(df)
+
+st.markdown("---")
+
+st.markdown("**Ammonia production via SMR**")
+
+st.write('''Amonia, ammonia, ammonia.''')
 
 expander = st.expander("Ammonia from SMR")
 item_name = "ammonia production, steam reforming, liquid"

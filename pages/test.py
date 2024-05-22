@@ -1,59 +1,37 @@
-from urllib.request import urlopen
-from tempfile import NamedTemporaryFile
-import pandas as pd
+import streamlit as st
+import geemap.foliumap as geemap
+import ee
+import os
+os.environ['EARTHENGINE_TOKEN'] = '1//03jrOgJyJRsYeCgYIARAAGAMSNwF-L9IrZcFiXw-FJxUYZSjN97jpdy5sBaN0LQUcm6fw7VZhcf0pjkxduhE1ZSW5LD4s320owzw'
 
-URL = "https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat=43.667&lon=5.596&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower=1300&loss=14&components=1"
+st.set_page_config(layout="wide")
 
-# Create a temporary file to save the CSV data
-o = NamedTemporaryFile(suffix=".csv", delete=False)
+# Customize the sidebar
+markdown = """
+Web App URL: <https://geemap.streamlit.app>
+"""
 
-# Download the CSV data
-r = urlopen(URL)
-o.write(r.read())
-o.close()
+# Customize page title
+st.title("Earth Engine Web App")
 
-# Initialize variables
-data = []
-start_line = 12  # Line to start reading the actual data
-header = ["DateTime", "elec_W"]
+st.markdown(
+    """
+    This multipage app template demonstrates various interactive web apps created using [streamlit](https://streamlit.io) and [geemap](https://geemap.org). It is an open-source project and you are very welcome to contribute to the [GitHub repository](https://github.com/giswqs/geemap-apps).
+    """
+)
 
-# Read the CSV file starting from the 12th line
-with open(o.name, 'r') as file:
-    for i, line in enumerate(file):
-        if i >= start_line:
-            # Stop reading if an empty line is encountered
-            if line.strip() == "":
-                break
-            # Split the line by commas and select only the first and second columns
-            columns = line.strip().split(',')
-            if len(columns) >= 2:
-                data.append([columns[0], columns[1]])
+st.header("Instructions")
 
-# Create a DataFrame from the data and name the columns
-df = pd.DataFrame(data, columns=header)
+markdown = """
+1. For the [GitHub repository](https://github.com/giswqs/geemap-apps) or [use it as a template](https://github.com/new?template_name=geemap-apps&template_owner=giswqs) for your own project.
+2. Customize the sidebar by changing the sidebar text and logo in each Python files.
+3. Find your favorite emoji from https://emojipedia.org.
+4. Add a new app to the `pages/` directory with an emoji in the file name, e.g., `1_🚀_Chart.py`.
+"""
 
-# Convert 'elec_W' column to numeric, handling possible conversion issues
-df['elec_W'] = pd.to_numeric(df['elec_W'], errors='coerce')
+st.markdown(markdown)
 
-# Display the first few rows of the DataFrame
-#print(df.head())
-#print(df)
-#print(df.iloc[:20, :])
-
-# Define the threshold (10% of 1,000,000)
-threshold = 0.05 * 1000000
-
-# Sum of all elec_W figures
-total_sum = df['elec_W'].sum()
-
-# Sum of elec_W figures excluding values smaller than the threshold
-filtered_sum = df[df['elec_W'] >= threshold]['elec_W'].sum()
-
-real_power_pv=(total_sum)/1000#convert to kw
-hours_year = 366 * 24 #2020 has 366 days
-necessary_power=1000*hours_year #kwh
-grid=necessary_power-real_power_pv
-print(real_power_pv)
-print(hours_year)
-print(grid/necessary_power)
+m = geemap.Map(location=[46.903354, 2.088334], zoom_start=6)
+m.add_basemap("OpenTopoMap")
+m.to_streamlit(height=500)
 

@@ -1,5 +1,6 @@
 def show():
     import streamlit as st
+    from streamlit_extras.colored_header import colored_header
 
     image_logo = "HySPI.png"
 
@@ -11,9 +12,11 @@ def show():
 
     st.markdown("# Industrial&nbsp;Hydrogen")
     st.markdown("### Prospective Scenarios of Environmental Impacts")
-    st.markdown("**ISIGE, O.I.E and PSI**")
-
-    st.markdown("---")
+    colored_header(
+        label=st.markdown("ISIGE, O.I.E and PSI"),
+        description="",
+        color_name="blue-70",
+    )
 
     st.write('''
     The HySPI project aims to develop protocols and tools for holistically, multi-criteria, and prospectively analyzing the environmental impacts of industrial hydrogen (H2) value chains in France, from production to on-site usage, including storage and distribution. To achieve this, prospective Life Cycle Assessment (LCA) methods, both attributional and consequential, will be employed.

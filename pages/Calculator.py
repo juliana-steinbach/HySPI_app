@@ -5,6 +5,9 @@ import pandas as pd
 from streamlit_folium import st_folium
 from urllib.request import urlopen
 from tempfile import NamedTemporaryFile
+from streamlit_extras.colored_header import colored_header
+import time
+
 
 def show():
 
@@ -14,16 +17,20 @@ def show():
 
     st.set_page_config(layout="wide")
 
-    st.title("HySPI Hydrogen Impact Calculator")
-    st.markdown("---")
-    st.write("## Foreground")
+    st.markdown("# HySPI Calculator")
+
+    colored_header(
+        label="Foreground",
+        description="Parameters extracted directly from your production plant",
+        color_name="blue-70",
+    )
 
 
     col1, col2, col3 = st.columns([1, 1, 1])
 
     #Forefround questions
     stack_type = col1.selectbox("Select the electrolyzer stack:", ["PEM", "AEC"])
-    elec_cap_mw = col2.number_input("Select the electrolyzer capacity (MW):", value=1, min_value=1, step=1)
+    elec_cap_kw = col2.number_input("Select the electrolyzer capacity (kW):", value=1000, min_value=1, step=1)
     stack_LT = col3.number_input("Select the stack lifetime (h):", value=120000, min_value=1, step=1)
     BoP_LT_y = col1.number_input("Select the BoP lifetime (years):", value=20, min_value=1, step=1)
     eff = col2.number_input("Select the stack efficiency (0 to 1):", value=0.72, min_value=0.0, max_value=1.0, step=0.01)
@@ -36,9 +43,10 @@ def show():
 
     if renewable_coupling == "Yes":
         with st.container():
-            col1, col2 = st.columns([2, 1])
+            col1, col2 = st.columns([1, 1])
             col1.write("### Pick a location on the map")
-            hours_year = 365 * 24
+            col2.write("### PV share")
+            pv_cap_kw = col2.number_input("Select the PV farm capacity (kW):", value=1000, min_value=0, step=1)
 
             with col1:
                 def get_pos(lat, lng):
@@ -49,24 +57,26 @@ def show():
                 if 'markers2' not in st.session_state:
                     st.session_state.markers2 = []
                 # Create a Folium map
-                m = folium.Map(location=[46.903354, 2.088334], zoom_start=6)
+                m = folium.Map(location=[46.903354, 2.088334], zoom_start=5)
                 m.add_child(folium.LatLngPopup())
 
                 # When the user interacts with the map
                 map = st_folium(
                     m,
-                    width=600, height=620,
+                    width=400, height=420,
                     key="folium_map"
                 )
                 if map.get("last_clicked"):
                     data = get_pos(map["last_clicked"]["lat"], map["last_clicked"]["lng"])
 
     if data is not None:
+
         #https: // re.jrc.ec.europa.eu / api / v5_2 / seriescalc?lat = 43.667 & lon = 5.596 & raddatabase = PVGIS - SARAH2 & browser = 1 & outputformat = csv & userhorizon = & usehorizon = 1 & angle = & aspect = & startyear = 2020 & endyear = 2020 & mountingplace = free & optimalinclination = 0 & optimalangles = 1 & js = 1 & select_database_hourly = PVGIS - SARAH2 & hstartyear = 2020 & hendyear = 2020 & trackingtype = 0 & hourlyoptimalangles = 1 & pvcalculation = 1 & pvtechchoice = crystSi & peakpower = 1300 & loss = 14 & components = 1
         #https://re.jrc.ec.europa.eu/pvg_tools/en/    hourly data
         #"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat=45.256&lon=2.734&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=0&aspect=1&startyear=2005&endyear=2005&mountingplace=free&optimalinclination=0&optimalangles=0&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2005&hendyear=2005&trackingtype=0&hourlyangle=0&hourlyaspect=1&pvcalculation=1&pvtechchoice=crystSi&peakpower=1&loss=14"
         #URL=f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat={data[0]}&lon={data[1]}&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={elec_cap_mw * 1.3}&loss=14"
-        URL = f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat={data[0]:.3f}&lon={data[1]:.3f}&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={elec_cap_mw *1000* 1.3}&loss=14&components=1"
+        #URL = f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat={data[0]:.3f}&lon={data[1]:.3f}&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={pv_cap_mw *1000* 1.3}&loss=14&components=1"
+        URL = f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat=43.4928&lon=6.8555&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={pv_cap_kw * 1.3}&loss=14&components=1"
 
         # Create a temporary file to save the CSV data
         o = NamedTemporaryFile(suffix=".csv", delete=False)
@@ -108,20 +118,35 @@ def show():
         threshold = 0.05 * 1000000
 
         # Sum of all elec_W figures
-        total_sum = df['elec_W'].sum()
+        total_sum100PV = df['elec_W'].sum()
+        total_sum_real = df[df['elec_W'] < 1000000]['elec_W'].sum()
 
         # Sum of elec_W figures excluding values smaller than the threshold
         filtered_sum = df[df['elec_W'] >= threshold]['elec_W'].sum()
 
-        real_power_pv = (total_sum) / 1000  # convert to kw
+        power_pv100 = (total_sum100PV) / 1000  # convert to kw
+        power_pv_real = (total_sum_real) / 1000  # convert to kw
         hours_year = 366 * 24  # 2020 has 366 days
         necessary_power = 1000 * hours_year  # kwh
-        grid = necessary_power - real_power_pv
+        grid100 = necessary_power - power_pv100
+        grid=necessary_power - power_pv_real
 
-        percentage_grid = grid / necessary_power
+        percentage_grid = grid100 / necessary_power
         percentage_pv=1-percentage_grid
 
-        col2.write(f"percentage from grid: {percentage_grid}, percentage from PV: {percentage_pv}")
+        percentage_grid = min(max(percentage_grid, 0), 1)
+        percentage_pv = min(max(percentage_pv, 0), 1)
+
+        percentage_grid_real = grid / necessary_power
+        percentage_pv_real = 1 - percentage_grid_real
+
+        percentage_grid_real = min(max(percentage_grid_real, 0), 1)
+        percentage_pv_real = min(max(percentage_pv_real, 0), 1)
+
+        col2.write(f"percentage from grid: {percentage_grid:.2%}")
+        col2.write(f"percentage from PV: {percentage_pv:.2%}")
+        col2.write(f"percentage from grid: {percentage_grid_real:.2%}")
+        col2.write(f"percentage from PV: {percentage_pv_real:.2%}")
 
     #Help tooltips with data from IEA for stack and efficiency
     st.markdown("""
@@ -279,11 +304,14 @@ def show():
     st.markdown(css_code, unsafe_allow_html=True)
 
     #Indication for background before the data
-    st.markdown("---")
-    st.write("## Background")
+    colored_header(
+        label="Background",
+        description="Electricity scenarios",
+        color_name="blue-70",
+    )
 
 
-    col4, col5, col6, col7 = st.columns([1.2, 1.2, 1.2, 1.2])
+    col4, col5, col6, col7 = st.columns([1, 1, 1, 1])
 
     demand_scenario = col4.radio("**Demand Scenarios**",options=["Reference", "Sobriety", "Reindustrialization"],key="demand_scenario")
     production_scenario = col5.radio("**Production Scenarios**",options=["M0", "M1", "M23", "N1", "N2", "N03"],key="production_scenario", horizontal=True)
@@ -304,7 +332,9 @@ def show():
                     st.write("Demand modelling in progress, not currently available")
             else:
                 if iam_applied == "None":
-                    choice = "EFR2050RM1E"
+                    choice = "EFR2050RM0E"
+                elif iam_applied == "SSP2-Base":
+                    choice = "EFR2050BRM0N"
                 else:
                     st.write("Demand modelling in progress, not currently available")
         elif production_scenario == "M1":
@@ -320,6 +350,8 @@ def show():
             else:
                 if iam_applied == "None":
                     choice = "EFR2050RM1E"
+                elif iam_applied == "SSP2-Base":
+                    choice = "EFR2050BRM1N"
                 else:
                     st.write("Demand modelling in progress, not currently available")
         elif production_scenario == "M23":
@@ -335,6 +367,10 @@ def show():
             else:
                 if iam_applied == "None":
                     choice = "EFR2050RM23E"
+                elif iam_applied == "SSP2-Base":
+                    choice = "EFR2050BRM23N"
+                elif iam_applied == "SSP2-Base":
+                    choice = "EFR2050BRM1N"
                 else:
                     st.write("Demand modelling in progress, not currently available")
         elif production_scenario == "N1":
@@ -349,7 +385,9 @@ def show():
                     st.write("Demand modelling in progress, not currently available")
             else:
                 if iam_applied == "None":
-                    choice = "EFR2050RN01E"
+                    choice = "EFR2050RN1E"
+                elif iam_applied == "SSP2-Base":
+                    choice = "EFR2050BRN1N"
                 else:
                     st.write("Demand modelling in progress, not currently available")
         elif production_scenario == "N2":
@@ -364,7 +402,9 @@ def show():
                     st.write("Demand modelling in progress, not currently available")
             else:
                 if iam_applied == "None":
-                    choice = "EFR2050RN01E"
+                    choice = "EFR2050RN2E"
+                elif iam_applied == "SSP2-Base":
+                    choice = "EFR2050BRN2N"
                 else:
                     st.write("Demand modelling in progress, not currently available")
         elif production_scenario == "N03":
@@ -380,6 +420,8 @@ def show():
             else:
                 if iam_applied == "None":
                     choice = "EFR2050RN03E"
+                elif iam_applied == "SSP2-Base":
+                    choice = "EFR2050BRN03N"
                 else:
                     st.write("Demand modelling in progress, not currently available")
     else:
@@ -449,10 +491,18 @@ def show():
     Elec_FR_2050_RN1E = agb.findActivity(name="market for electricity, low voltage N1", db_name='RTE scenarios with RTE imports')
     Elec_FR_2050_RN2E = agb.findActivity(name="market for electricity, low voltage N2",db_name='RTE scenarios with RTE imports')
     Elec_FR_2050_RN03E = agb.findActivity(name="market for electricity, low voltage N03",db_name='RTE scenarios with RTE imports')
+    Elec_FR_2050_BRM0N = agb.findActivity("market for electricity, low voltage, FE2050 N", loc="FR", single=False, db_name=B50RM0)
+    Elec_FR_2050_BRM1N = agb.findActivity("market for electricity, low voltage, FE2050 N", loc="FR", single=False, db_name=B50RM1)
+    Elec_FR_2050_BRM23N = agb.findActivity("market for electricity, low voltage, FE2050 N", loc="FR", single=False, db_name=B50RM23)
+    Elec_FR_2050_BRN1N = agb.findActivity("market for electricity, low voltage, FE2050 N", loc="FR", single=False, db_name=B50RN1)
+    Elec_FR_2050_BRN2N = agb.findActivity("market for electricity, low voltage, FE2050 N", loc="FR", single=False, db_name=B50RN2)
+    Elec_FR_2050_BRN03N = agb.findActivity("market for electricity, low voltage, FE2050 N", loc="FR", single=False,db_name=B50RN03)
 
-    PV_coupled = agb.findActivity("electricity production, photovoltaic, 570kWp open ground installation, multi-Si",loc="FR", single=False, db_name=EI)
+    #PV_coupled = agb.findActivity("electricity production, photovoltaic, 570kWp open ground installation, multi-Si",loc="FR", single=False, db_name=EI)
+    PV_coupled = agb.findActivity("electricity production, photovoltaic",loc="FR", db_name=B50RM0)
 
     base = ["EFR2050BRM0", "EFR2050BRM1", "EFR2050BRM23", "EFR2050BRN1", "EFR2050BRN2", "EFR2050BRN03"]
+    N_base = ["EFR2050BRM0N", "EFR2050BRM1N", "EFR2050BRM23N", "EFR2050BRN1N", "EFR2050BRN2N", "EFR2050BRN03N"]
     R19 = ["EFR2050R19RM0", "EFR2050R19RM1", "EFR2050R19RM23", "EFR2050R19RN1", "EFR2050R19RN2", "EFR2050R19RN03"]
     R26 = ["EFR2050R26RM0", "EFR2050R26RM1", "EFR2050R26RM23", "EFR2050R26RN1", "EFR2050R26RN2", "EFR2050R26RN03"]
     E_RTE = ["EFR2050RM0E", "EFR2050RM1E", "EFR2050RM23E", "EFR2050RN1E", "EFR2050RN2E", "EFR2050RN03E"]
@@ -535,7 +585,7 @@ def show():
     t_BoP_activity = negAct(agb.findActivity(name=activity_names[stack_type]['Treatment_BoP'], db_name='AEC/PEM'))
 
     #convert electrolyzer capacity to kW
-    elec_cap = elec_cap_mw * 1000
+    elec_cap = elec_cap_kw #no need to use 1000 anymore
 
     # BoP lifetime
     BoP_LT_h = BoP_LT_y * 365 * 24
@@ -563,7 +613,7 @@ def show():
         "param_electricity",  # Short name
         label="electricity mix",  # English label
         description="RTE scenarios for FR electricity",  # Long description
-        values=["EFR2023", "EDE2023", "PV"]+base+R19+R26+E_RTE,  # ["NONE"]
+        values=["EFR2023", "EDE2023", "PV"]+base+N_base+R19+R26+E_RTE,  # ["NONE"]
         default="Elec_FR_2050_BRM0")
 
     electricity = newSwitchAct(USER_DB, "electricity", param_electricity, {
@@ -593,7 +643,13 @@ def show():
         "EFR2050RM23E": Elec_FR_2050_RM23E,
         "EFR2050RN1E": Elec_FR_2050_RN1E,
         "EFR2050RN2E": Elec_FR_2050_RN2E,
-        "EFR2050RN03E": Elec_FR_2050_RN03E
+        "EFR2050RN03E": Elec_FR_2050_RN03E,
+        "EFR2050BRM0N": Elec_FR_2050_BRM0N,
+        "EFR2050BRM1N": Elec_FR_2050_BRM1N,
+        "EFR2050BRM23N": Elec_FR_2050_BRM23N,
+        "EFR2050BRN1N": Elec_FR_2050_BRN1N,
+        "EFR2050BRN2N": Elec_FR_2050_BRN2N,
+        "EFR2050BRN03N": Elec_FR_2050_BRN03N,
     })
 
     def define_production():
@@ -607,6 +663,18 @@ def show():
                                })
 
     production = define_production()
+
+    def define_production2():
+        return agb.newActivity(USER_DB, "H2 production phase",
+                               unit="unit",
+                               exchanges={
+                                   electricity: Electricity_1kg*percentage_grid_real,
+                                   PV_coupled:Electricity_1kg*percentage_pv_real,
+                                   water_H2: 0.0014,
+                                   Oxygen: -8
+                               })
+
+    production2 = define_production2()
 
     # land factors retrieved from Romain's LCI: no information was given regarding the references for these figures: *ask him!
     land_factor = 0.09 if stack_type == 'PEM' else 0.12
@@ -691,9 +759,27 @@ def show():
 
     system = define_system()
 
+    def define_system2():
+        return agb.newActivity(USER_DB, name=choice2,
+                               unit="kg",
+                               exchanges={
+                                   production2: 1,
+                                   infra: 1,
+                                   storage: 1
+                               })
+
+
+    system2 = define_system2()
+
 
     result_table_H2 = agb.multiLCAAlgebric(
         system,
+        impacts,
+        param_electricity=choice2
+    )
+
+    result_table_H2_2 = agb.multiLCAAlgebric(
+        system2,
         impacts,
         param_electricity=choice2
     )
@@ -713,6 +799,7 @@ def show():
 
     # Rename the columns in the result table using the mapping
     result_table_H2.rename(columns=header_mapping, inplace=True)
+    result_table_H2_2.rename(columns=header_mapping, inplace=True)
 
     for index, row in result_table_H2.iterrows():
         for column_name, value in row.items():
@@ -732,6 +819,7 @@ def show():
     st.markdown("---")
 
     st.table(result_table_H2)
+    st.table(result_table_H2_2)
 
     st.table(agb.exploreImpacts(impacts[0],
                        system,
@@ -739,6 +827,10 @@ def show():
                        ))
     st.table(agb.exploreImpacts(impacts[0],
                                 production,
+                                param_electricity=choice2
+                                ))
+    st.table(agb.exploreImpacts(impacts[0],
+                                production2,
                                 param_electricity=choice2
                                 ))
 
