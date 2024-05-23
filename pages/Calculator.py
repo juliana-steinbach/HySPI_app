@@ -30,7 +30,7 @@ def show():
 
     #Forefround questions
     stack_type = col1.selectbox("Select the electrolyzer stack:", ["PEM", "AEC"])
-    elec_cap_kw = col2.number_input("Select the electrolyzer capacity (kW):", value=1000, min_value=1, step=1)
+    elec_cap_MW = col2.number_input("Select the electrolyzer capacity (MW):", value=1, min_value=1, step=1)
     stack_LT = col3.number_input("Select the stack lifetime (h):", value=120000, min_value=1, step=1)
     BoP_LT_y = col1.number_input("Select the BoP lifetime (years):", value=20, min_value=1, step=1)
     eff = col2.number_input("Select the stack efficiency (0 to 1):", value=0.72, min_value=0.0, max_value=1.0, step=0.01)
@@ -46,7 +46,9 @@ def show():
             col1, col2 = st.columns([1, 1])
             col1.write("### Pick a location on the map")
             col2.write("### PV share")
-            pv_cap_kw = col2.number_input("Select the PV farm capacity (kW):", value=1000, min_value=0, step=1)
+            pv_cap_MW = col2.number_input("Select the PV farm capacity (MW):", value=1, min_value=0, step=1)
+
+
 
             with col1:
                 def get_pos(lat, lng):
@@ -76,7 +78,7 @@ def show():
         #"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat=45.256&lon=2.734&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=0&aspect=1&startyear=2005&endyear=2005&mountingplace=free&optimalinclination=0&optimalangles=0&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2005&hendyear=2005&trackingtype=0&hourlyangle=0&hourlyaspect=1&pvcalculation=1&pvtechchoice=crystSi&peakpower=1&loss=14"
         #URL=f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat={data[0]}&lon={data[1]}&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={elec_cap_mw * 1.3}&loss=14"
         #URL = f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat={data[0]:.3f}&lon={data[1]:.3f}&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={pv_cap_mw *1000* 1.3}&loss=14&components=1"
-        URL = f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat=43.4928&lon=6.8555&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={pv_cap_kw * 1.3}&loss=14&components=1"
+        URL = f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat=43.4928&lon=6.8555&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={pv_cap_MW*1000* 1.3}&loss=14&components=1"
 
         # Create a temporary file to save the CSV data
         o = NamedTemporaryFile(suffix=".csv", delete=False)
@@ -119,7 +121,9 @@ def show():
 
         # Sum of all elec_W figures
         total_sum100PV = df['elec_W'].sum()
-        total_sum_real = df[df['elec_W'] < 1000000]['elec_W'].sum()
+        capped_values = df['elec_W'].clip(upper=elec_cap_MW*1000000)
+        total_sum_real = capped_values.sum()
+        credit=total_sum100PV-total_sum_real
 
         # Sum of elec_W figures excluding values smaller than the threshold
         filtered_sum = df[df['elec_W'] >= threshold]['elec_W'].sum()
@@ -131,22 +135,28 @@ def show():
         grid100 = necessary_power - power_pv100
         grid=necessary_power - power_pv_real
 
-        percentage_grid = grid100 / necessary_power
-        percentage_pv=1-percentage_grid
-
-        percentage_grid = min(max(percentage_grid, 0), 1)
-        percentage_pv = min(max(percentage_pv, 0), 1)
-
         percentage_grid_real = grid / necessary_power
         percentage_pv_real = 1 - percentage_grid_real
 
         percentage_grid_real = min(max(percentage_grid_real, 0), 1)
         percentage_pv_real = min(max(percentage_pv_real, 0), 1)
 
-        col2.write(f"percentage from grid: {percentage_grid:.2%}")
-        col2.write(f"percentage from PV: {percentage_pv:.2%}")
         col2.write(f"percentage from grid: {percentage_grid_real:.2%}")
         col2.write(f"percentage from PV: {percentage_pv_real:.2%}")
+
+        if total_sum_real is not None:
+            col2.write(f"During peak hours you are producing {credit/1000000:.2f}MW of extra electricity throughout the year!")
+            credits_use=col2.selectbox("Will you be using the PV credits to offset the electricity from the grid?", ["Yes", "No"], index=1)
+            if credits_use == "Yes":
+                percentage_grid = grid100 / necessary_power
+                percentage_pv = 1 - percentage_grid
+
+                percentage_grid = min(max(percentage_grid, 0), 1)
+                percentage_pv = min(max(percentage_pv, 0), 1)
+
+                col2.write(f"new percentage from grid: {percentage_grid:.2%}")
+                col2.write(f"new percentage from PV: {percentage_pv:.2%}")
+
 
     #Help tooltips with data from IEA for stack and efficiency
     st.markdown("""
@@ -585,7 +595,7 @@ def show():
     t_BoP_activity = negAct(agb.findActivity(name=activity_names[stack_type]['Treatment_BoP'], db_name='AEC/PEM'))
 
     #convert electrolyzer capacity to kW
-    elec_cap = elec_cap_kw #no need to use 1000 anymore
+    elec_cap = elec_cap_MW/1000
 
     # BoP lifetime
     BoP_LT_h = BoP_LT_y * 365 * 24
@@ -665,7 +675,7 @@ def show():
     production = define_production()
 
     def define_production2():
-        return agb.newActivity(USER_DB, "H2 production phase",
+        return agb.newActivity(USER_DB, "H2 production phase_real",
                                unit="unit",
                                exchanges={
                                    electricity: Electricity_1kg*percentage_grid_real,
@@ -760,7 +770,7 @@ def show():
     system = define_system()
 
     def define_system2():
-        return agb.newActivity(USER_DB, name=choice2,
+        return agb.newActivity(USER_DB, name=f"{choice2}_real" ,
                                unit="kg",
                                exchanges={
                                    production2: 1,

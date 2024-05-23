@@ -4,8 +4,8 @@ from tempfile import NamedTemporaryFile
 from urllib.request import urlopen
 from tempfile import NamedTemporaryFile
 
-
-URL = f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat=43.4928&lon=6.8555&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={1.5 * 1000 * 1.3}&loss=14&components=1"
+PV=5000*1.3
+URL = f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat=43.4928&lon=6.8555&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={PV}&loss=14&components=1"
 
 # Create a temporary file to save the CSV data
 o = NamedTemporaryFile(suffix=".csv", delete=False)
@@ -48,9 +48,15 @@ threshold = 0.05 * 1000000
 
 # Sum of all elec_W figures
 total_sum100PV = df['elec_W'].sum()
-total_sum_real = df[df['elec_W'] < 1000000]['elec_W'].sum()
+capped_values = df['elec_W'].clip(upper=1000000)
+total_sum_real = capped_values.sum()
+
+# Calculate the difference that is left out
+difference_left_out = df['elec_W'].sum() - total_sum_real
+
 print(total_sum100PV)
 print(total_sum_real)
+print(difference_left_out)
 
 power_pv100 = (total_sum100PV) / 1000  # convert to kw
 power_pv_real = (total_sum_real) / 1000  # convert to kw
