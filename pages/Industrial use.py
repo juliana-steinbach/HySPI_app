@@ -98,11 +98,35 @@ def main():
     co2_impact_hydrogen_tons = co2_impact_hydrogen / 1000
     difference_tons = difference / 1000
 
-    col3.write(f"Total Ammonia produced in France: 1500 tons")
-    col3.write(f"Selected Ammonia production: {total_production_tons/1500:.2%} tons")
-    col3.write(f"Total CO2 impact produced using SMR: {int(co2_impact_smr_tons)} tons of CO2")
-    col3.write(f"Total CO2 impact produced using hydrogen: {int(co2_impact_hydrogen_tons)} tons of CO2")
-    col3.write(f'Electrolysis can save {int(difference_tons)} tons of CO2 per year in the Ammonia sector')
+    #col3.write(f"Total Ammonia produced in France: 1500 tons")
+    #col3.write(f"Selected Ammonia production: {total_production_tons/1500:.2%} tons")
+    #col3.write(f"Total CO2 impact produced using SMR: {int(co2_impact_smr_tons)} tons of CO2")
+    #col3.write(f"Total CO2 impact produced using hydrogen: {int(co2_impact_hydrogen_tons)} tons of CO2")
+    #col3.write(f'Electrolysis can save {int(difference_tons)} tons of CO2 per year in the Ammonia sector')
+    # Dados organizados em listas
+    descriptions = [
+        "Total Ammonia produced in France [t]",
+        "Selected Ammonia production",
+        "",
+        "Impact produced using SMR",
+        "Impact produced using hydrogen",
+        "Impact reduction"
+    ]
+
+    values = [
+            "1500",
+            f"{total_production_tons / 1499:.2%}",
+            "[tCO2eq]",
+            f"{int(co2_impact_smr_tons)}",
+            f"{int(co2_impact_hydrogen_tons)}",
+            f"{int(difference_tons)}"
+        ]
+
+    data = list(zip(descriptions, values))
+    df = pd.DataFrame(data, columns=["", ""])
+
+
+    col3.write(df.to_html(index=False, header=False), unsafe_allow_html=True)
 
     if map["last_object_clicked"] != st.session_state.get("last_object_clicked"):
         st.session_state["last_object_clicked"] = map["last_object_clicked"]

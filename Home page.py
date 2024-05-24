@@ -12,8 +12,9 @@ def show():
 
     st.markdown("# Industrial&nbsp;Hydrogen")
     st.markdown("### Prospective Scenarios of Environmental Impacts")
+    st.markdown("ISIGE, O.I.E and PSI")
     colored_header(
-        label=st.markdown("ISIGE, O.I.E and PSI"),
+        label="",
         description="",
         color_name="blue-70",
     )

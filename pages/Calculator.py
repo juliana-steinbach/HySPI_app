@@ -120,35 +120,35 @@ def show():
         threshold = 0.05 * 1000000
 
         # Sum of all elec_W figures
-        total_sum100PV = df['elec_W'].sum()
+        total_sumPV_credit = df['elec_W'].sum()
         capped_values = df['elec_W'].clip(upper=elec_cap_MW*1000000)
         total_sum_real = capped_values.sum()
-        credit=total_sum100PV-total_sum_real
+        credit=total_sumPV_credit-total_sum_real
 
         # Sum of elec_W figures excluding values smaller than the threshold
         filtered_sum = df[df['elec_W'] >= threshold]['elec_W'].sum()
 
-        power_pv100 = (total_sum100PV) / 1000  # convert to kw
+        power_pv_credit = (total_sumPV_credit) / 1000  # convert to kw
         power_pv_real = (total_sum_real) / 1000  # convert to kw
         hours_year = 366 * 24  # 2020 has 366 days
         necessary_power = 1000 * hours_year  # kwh
-        grid100 = necessary_power - power_pv100
+        grid_credit = necessary_power - power_pv_credit
         grid=necessary_power - power_pv_real
 
-        percentage_grid_real = grid / necessary_power
-        percentage_pv_real = 1 - percentage_grid_real
+        percentage_grid = grid / necessary_power
+        percentage_pv = 1 - percentage_grid
 
-        percentage_grid_real = min(max(percentage_grid_real, 0), 1)
-        percentage_pv_real = min(max(percentage_pv_real, 0), 1)
+        percentage_grid_real = min(max(percentage_grid, 0), 1)
+        percentage_pv_real = min(max(percentage_pv, 0), 1)
 
-        col2.write(f"percentage from grid: {percentage_grid_real:.2%}")
-        col2.write(f"percentage from PV: {percentage_pv_real:.2%}")
+        col2.write(f"percentage from grid: {percentage_grid:.2%}")
+        col2.write(f"percentage from PV: {percentage_pv:.2%}")
 
         if total_sum_real is not None:
             col2.write(f"During peak hours you are producing {credit/1000000:.2f}MW of extra electricity throughout the year!")
             credits_use=col2.selectbox("Will you be using the PV credits to offset the electricity from the grid?", ["Yes", "No"], index=1)
             if credits_use == "Yes":
-                percentage_grid = grid100 / necessary_power
+                percentage_grid = grid_credit / necessary_power
                 percentage_pv = 1 - percentage_grid
 
                 percentage_grid = min(max(percentage_grid, 0), 1)
@@ -595,7 +595,7 @@ def show():
     t_BoP_activity = negAct(agb.findActivity(name=activity_names[stack_type]['Treatment_BoP'], db_name='AEC/PEM'))
 
     #convert electrolyzer capacity to kW
-    elec_cap = elec_cap_MW/1000
+    elec_cap = elec_cap_MW*1000
 
     # BoP lifetime
     BoP_LT_h = BoP_LT_y * 365 * 24
@@ -674,17 +674,6 @@ def show():
 
     production = define_production()
 
-    def define_production2():
-        return agb.newActivity(USER_DB, "H2 production phase_real",
-                               unit="unit",
-                               exchanges={
-                                   electricity: Electricity_1kg*percentage_grid_real,
-                                   PV_coupled:Electricity_1kg*percentage_pv_real,
-                                   water_H2: 0.0014,
-                                   Oxygen: -8
-                               })
-
-    production2 = define_production2()
 
     # land factors retrieved from Romain's LCI: no information was given regarding the references for these figures: *ask him!
     land_factor = 0.09 if stack_type == 'PEM' else 0.12
@@ -769,30 +758,12 @@ def show():
 
     system = define_system()
 
-    def define_system2():
-        return agb.newActivity(USER_DB, name=f"{choice2}_real" ,
-                               unit="kg",
-                               exchanges={
-                                   production2: 1,
-                                   infra: 1,
-                                   storage: 1
-                               })
-
-
-    system2 = define_system2()
-
-
     result_table_H2 = agb.multiLCAAlgebric(
         system,
         impacts,
         param_electricity=choice2
     )
 
-    result_table_H2_2 = agb.multiLCAAlgebric(
-        system2,
-        impacts,
-        param_electricity=choice2
-    )
 
     header_mapping = {
         'climate change no LT - global warming potential (GWP100) no LT[kg CO2-Eq]': 'climate change [kg CO2-Eq]',
@@ -809,11 +780,16 @@ def show():
 
     # Rename the columns in the result table using the mapping
     result_table_H2.rename(columns=header_mapping, inplace=True)
-    result_table_H2_2.rename(columns=header_mapping, inplace=True)
 
-    for index, row in result_table_H2.iterrows():
-        for column_name, value in row.items():
-            st.write(f"{column_name}: {value:.2e}")
+    transposed_table = result_table_H2.transpose()
+
+    # Display the transposed DataFrame
+    st.table(transposed_table)
+
+    #in case we want text, but as tables are better visually, I am keeping this as backup plan
+    #for index, row in result_table_H2.iterrows():
+     #   for column_name, value in row.items():
+      #      st.write(f"{column_name}: {value:.2e}")
 
     with st.container():
         paragraph = (
@@ -828,8 +804,6 @@ def show():
 
     st.markdown("---")
 
-    st.table(result_table_H2)
-    st.table(result_table_H2_2)
 
     st.table(agb.exploreImpacts(impacts[0],
                        system,
@@ -839,10 +813,7 @@ def show():
                                 production,
                                 param_electricity=choice2
                                 ))
-    st.table(agb.exploreImpacts(impacts[0],
-                                production2,
-                                param_electricity=choice2
-                                ))
+
 
     #Industrial use
 
