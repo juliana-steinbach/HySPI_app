@@ -29,6 +29,14 @@ def extract_data(filename, sheet_name, item_name, columns, column_names):
         line_data += 1
 
     df_final = pd.DataFrame(table, columns=column_names)
+
+    # Convert all columns to scientific notation
+    pd.set_option('display.float_format', lambda x: '%.2e' % x)
+
+    # Alternatively, if you only want to convert specific columns:
+    for column in column_names:
+        df_final[column] = df_final[column].apply(lambda x: format(x, '.2e') if isinstance(x, (int, float)) else x)
+
     return df_final
 
 #Page content
@@ -158,16 +166,5 @@ columns = [0, 1, 2, 3, 5]
 df = extract_data('electrolyzers_LCI.xlsx', 'M1-2', item_name, columns, column_names)
 expander.table(df)
 
-st.markdown("---")
 
-st.markdown("**Ammonia production via SMR**")
-
-st.write('''Amonia, ammonia, ammonia.''')
-
-expander = st.expander("Ammonia from SMR")
-item_name = "ammonia production, steam reforming, liquid"
-column_names = ["Name", "Amount", "Location", "Unit", "Category", "Type"]
-columns = [0, 1, 2, 3, 4, 5]
-df = extract_data('electrolyzers_LCI.xlsx', 'M1-2', item_name, columns, column_names)
-expander.table(df)
 

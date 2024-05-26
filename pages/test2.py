@@ -38,44 +38,52 @@ df = pd.DataFrame(data2, columns=header)
 # Convert 'elec_W' column to numeric, handling possible conversion issues
 df['elec_W'] = pd.to_numeric(df['elec_W'], errors='coerce')
 
-# Display the first few rows of the DataFrame
-# print(df.head())
-# print(df)
-#print(df.iloc[:20, :])
+df['DateTime'] = pd.to_datetime(df['DateTime'], format='%Y%m%d:%H%M')
 
-# Define the threshold (10% of 1,000,000)
-threshold = 0.05 * 1000000
+# Extract date part and create a new column
+df['Date'] = df['DateTime'].dt.date
 
-# Sum of all elec_W figures
-total_sum100PV = df['elec_W'].sum()
-capped_values = df['elec_W'].clip(upper=1000000)
-total_sum_real = capped_values.sum()
+# Group by the date and sum the 'elec_W' values
+daily_sums = df.groupby('Date')['elec_W'].sum().reset_index()
+daily_sums_24 = df.groupby('Date')['elec_W'].sum().reset_index()
 
-# Calculate the difference that is left out
-difference_left_out = df['elec_W'].sum() - total_sum_real
+# Rename columns for clarity
+daily_sums.columns = ['Date', 'Total_elec_W_day']
+daily_sums_24.columns = ['Date', 'Total_elec_W_day_24']
 
-print(total_sum100PV)
-print(total_sum_real)
-print(difference_left_out)
+max_value = 24000000  # Adjust this value to your desired cap
 
-power_pv100 = (total_sum100PV) / 1000  # convert to kw
-power_pv_real = (total_sum_real) / 1000  # convert to kw
-hours_year = 366 * 24  # 2020 has 366 days
-necessary_power = 1000 * hours_year  # kwh
-grid100 = necessary_power - power_pv100
-grid=necessary_power - power_pv_real
+daily_sums_24['Total_elec_W_day_24'] = daily_sums_24['Total_elec_W_day_24'].clip(upper=max_value)
+#total_sum_real_day = daily_sums_24['Total_elec_W_day_24'].sum()
+merged_df = pd.merge(daily_sums, daily_sums_24, on='Date')
 
-percentage_grid = grid100 / necessary_power
-percentage_pv=1-percentage_grid
+# Calculate the difference
+merged_df['Difference'] = merged_df['Total_elec_W_day'] - merged_df['Total_elec_W_day_24']
 
-percentage_grid_real = grid / necessary_power
-percentage_pv_real = 1 - percentage_grid_real
+# Create the new DataFrame with 'Date' and 'Difference'
+diff_column = merged_df[['Date', 'Difference']]
 
-print(grid100)
-print(grid)
+# Rename the columns if needed
+diff_column.columns = ['Date', 'Total_elec_W_day_Difference']
 
-print(percentage_grid)
-print(percentage_pv)
+total_sum_real_year = daily_sums['Total_elec_W_day'].sum() #=TOTAL_power_produced = df['elec_W'].sum()
+total_sum_real_day = daily_sums_24['Total_elec_W_day_24'].sum()
+total_extra_not_credit = diff_column['Total_elec_W_day_Difference'].sum()
 
-print(percentage_grid_real)
-print(percentage_pv_real)
+TOTAL_power_produced = df['elec_W'].sum()
+capped_values = df['elec_W'].clip(upper=1*1000000)
+real_consumption = capped_values.sum()
+credit=TOTAL_power_produced-real_consumption
+credit_minus_daily_extra = TOTAL_power_produced - real_consumption - total_extra_not_credit
+
+print(daily_sums)
+print(daily_sums_24)
+print(diff_column)
+print(total_sum_real_year)
+print(total_sum_real_day)
+print(TOTAL_power_produced)
+print(real_consumption)
+print(total_extra_not_credit)
+print(f"credit: {credit}")
+print(f"not credit: {credit_minus_daily_extra}")
+

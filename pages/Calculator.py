@@ -46,7 +46,7 @@ def show():
             col1, col2 = st.columns([1, 1])
             col1.write("### Pick a location on the map")
             col2.write("### PV share")
-            pv_cap_MW = col2.number_input("Select the PV farm capacity (MW):", value=1, min_value=0, step=1)
+            pv_cap_MW = col2.number_input("Select the PV farm capacity (MW):", value=1.0, min_value=0.1,max_value=1000000.0, step=0.1)
 
 
 
@@ -111,28 +111,17 @@ def show():
         # Convert 'elec_W' column to numeric, handling possible conversion issues
         df['elec_W'] = pd.to_numeric(df['elec_W'], errors='coerce')
 
-        # Display the first few rows of the DataFrame
-        # print(df.head())
-        # print(df)
-        # print(df.iloc[:20, :])
-
-        # Define the threshold (10% of 1,000,000)
-        threshold = 0.05 * 1000000
-
         # Sum of all elec_W figures
-        total_sumPV_credit = df['elec_W'].sum()
+        TOTAL_power_produced = df['elec_W'].sum()
         capped_values = df['elec_W'].clip(upper=elec_cap_MW*1000000)
-        total_sum_real = capped_values.sum()
-        credit=total_sumPV_credit-total_sum_real
+        real_consumption = capped_values.sum()
+        credit=TOTAL_power_produced-real_consumption
 
-        # Sum of elec_W figures excluding values smaller than the threshold
-        filtered_sum = df[df['elec_W'] >= threshold]['elec_W'].sum()
-
-        power_pv_credit = (total_sumPV_credit) / 1000  # convert to kw
-        power_pv_real = (total_sum_real) / 1000  # convert to kw
+        power_pv_year = TOTAL_power_produced / 1000  # convert to kw
+        power_pv_real = real_consumption / 1000  # convert to kw
         hours_year = 366 * 24  # 2020 has 366 days
         necessary_power = 1000 * hours_year  # kwh
-        grid_credit = necessary_power - power_pv_credit
+        grid_credit = necessary_power - power_pv_year
         grid=necessary_power - power_pv_real
 
         percentage_grid = grid / necessary_power
@@ -141,11 +130,48 @@ def show():
         percentage_grid_real = min(max(percentage_grid, 0), 1)
         percentage_pv_real = min(max(percentage_pv, 0), 1)
 
-        col2.write(f"percentage from grid: {percentage_grid:.2%}")
-        col2.write(f"percentage from PV: {percentage_pv:.2%}")
+        col2.write(f"percentage from grid: {percentage_grid_real:.2%}")
+        col2.write(f"percentage from PV: {percentage_pv_real:.2%}")
 
-        if total_sum_real is not None:
+        #new part
+
+        df['DateTime'] = pd.to_datetime(df['DateTime'], format='%Y%m%d:%H%M')
+
+        # Extract date part and create a new column
+        df['Date'] = df['DateTime'].dt.date
+
+        # Group by the date and sum the 'elec_W' values
+        daily_sums = df.groupby('Date')['elec_W'].sum().reset_index()
+        daily_sums_24 = df.groupby('Date')['elec_W'].sum().reset_index()
+
+        # Rename columns for clarity
+        daily_sums.columns = ['Date', 'Total_elec_W_day']
+        daily_sums_24.columns = ['Date', 'Total_elec_W_day_24']
+
+        max_value = 24000000  # Adjust this value to your desired cap
+
+        daily_sums_24['Total_elec_W_day_24'] = daily_sums_24['Total_elec_W_day_24'].clip(upper=max_value)
+        # total_sum_real_day = daily_sums_24['Total_elec_W_day_24'].sum()
+        merged_df = pd.merge(daily_sums, daily_sums_24, on='Date')
+
+        # Calculate the difference
+        merged_df['Difference'] = merged_df['Total_elec_W_day'] - merged_df['Total_elec_W_day_24']
+
+        # Create the new DataFrame with 'Date' and 'Difference'
+        diff_column = merged_df[['Date', 'Difference']]
+
+        # Rename the columns if needed
+        diff_column.columns = ['Date', 'Total_elec_W_day_Difference']
+
+        total_sum_real_year = daily_sums['Total_elec_W_day'].sum()  # =TOTAL_power_produced = df['elec_W'].sum()
+        total_sum_real_day = daily_sums_24['Total_elec_W_day_24'].sum()
+        total_extra_not_credit = diff_column['Total_elec_W_day_Difference'].sum()
+        credit_minus_daily_extra = TOTAL_power_produced - real_consumption - total_extra_not_credit
+        grid_credit_daily=necessary_power-total_sum_real_day/1000
+
+        if credit !=0:
             col2.write(f"During peak hours you are producing {credit/1000000:.2f}MW of extra electricity throughout the year!")
+            col2.write(f"But due to daily restrictions regarding credit generation, {total_extra_not_credit/1000000:.2f}MW of extra electricity can not be allocated to PV")
             credits_use=col2.selectbox("Will you be using the PV credits to offset the electricity from the grid?", ["Yes", "No"], index=1)
             if credits_use == "Yes":
                 percentage_grid = grid_credit / necessary_power
@@ -154,8 +180,14 @@ def show():
                 percentage_grid = min(max(percentage_grid, 0), 1)
                 percentage_pv = min(max(percentage_pv, 0), 1)
 
-                col2.write(f"new percentage from grid: {percentage_grid:.2%}")
-                col2.write(f"new percentage from PV: {percentage_pv:.2%}")
+                col2.write(f"new percentage from grid: {percentage_grid:.2%} (no limits for credit allocation)")
+                col2.write(f"new percentage from PV: {percentage_pv:.2%} (no limits for credit allocation)")
+
+                percentage_grid_daily = grid_credit_daily / necessary_power
+                percentage_pv_daily = 1 - percentage_grid_daily
+
+                col2.write(f"newest percentage from grid: {percentage_grid_daily:.2%} (daily limits for credit allocation)")
+                col2.write(f"newest percentage from PV: {percentage_pv_daily:.2%} (daily limits for credit allocation)")
 
 
     #Help tooltips with data from IEA for stack and efficiency

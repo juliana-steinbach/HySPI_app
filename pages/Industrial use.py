@@ -1,10 +1,11 @@
 from __future__ import annotations
 from pathlib import Path
 import folium
-import pandas as pd
-import streamlit as st
 from streamlit_folium import st_folium
 import matplotlib.pyplot as plt
+import streamlit as st
+import pandas as pd
+import io
 from streamlit_extras.colored_header import colored_header
 
 if "first_element_ammonia" not in st.session_state or st.session_state.first_element_ammonia is None:
@@ -103,30 +104,27 @@ def main():
     #col3.write(f"Total CO2 impact produced using SMR: {int(co2_impact_smr_tons)} tons of CO2")
     #col3.write(f"Total CO2 impact produced using hydrogen: {int(co2_impact_hydrogen_tons)} tons of CO2")
     #col3.write(f'Electrolysis can save {int(difference_tons)} tons of CO2 per year in the Ammonia sector')
-    # Dados organizados em listas
-    descriptions = [
-        "Total Ammonia produced in France [t]",
-        "Selected Ammonia production",
-        "",
-        "Impact produced using SMR",
-        "Impact produced using hydrogen",
-        "Impact reduction"
-    ]
-
-    values = [
-            "1500",
-            f"{total_production_tons / 1499:.2%}",
-            "[tCO2eq]",
+    data = {
+        "Description": [
+            "Impact using SMR ",
+            "Impact using H2",
+            "Impact savings"
+        ],
+        "[tCO2eq]": [
             f"{int(co2_impact_smr_tons)}",
             f"{int(co2_impact_hydrogen_tons)}",
             f"{int(difference_tons)}"
         ]
+    }
 
-    data = list(zip(descriptions, values))
-    df = pd.DataFrame(data, columns=["", ""])
+    # Convert the dictionary to a DataFrame
+    df = pd.DataFrame(data)
+    df.set_index("Description", inplace=True)
+    df.index.name = None
+    col3.write("Total Ammonia produced in France: 1500t")
+    col3.write(f"Selected Ammonia production: {total_production_tons / 1499:.2%}")
+    col3.table(df)
 
-
-    col3.write(df.to_html(index=False, header=False), unsafe_allow_html=True)
 
     if map["last_object_clicked"] != st.session_state.get("last_object_clicked"):
         st.session_state["last_object_clicked"] = map["last_object_clicked"]
@@ -153,10 +151,70 @@ def main():
     for city_info in st.session_state["selected_cities"]:
         col2.write(f"- City: {city_info['city']}, Production: {city_info['production']}")
 
-    st.write("# Ammonia production")
+    colored_header(
+        label="Ammonia production technology",
+        description="",
+        color_name="blue-70",
+    )
+
+    # function to extract table from inventory and disply in page
+
+    def extract_data(filename, sheet_name, item_name, columns, column_names):
+        df = pd.read_excel(filename, sheet_name=sheet_name, header=None)
+        line = df[df[1] == item_name].index
+
+        line = line[0]
+
+        line_amount = df[df[1] == "amount"].index
+        line_amount = line_amount[line_amount > line][0]
+        line_data = line_amount + 2
+        table = []
+        while True:
+            try:
+                value = df.iloc[line_data, 1]
+                if pd.isnull(value):
+                    break
+                pd.to_numeric(value)
+            except (ValueError, TypeError):
+                break
+
+            values = [df.iloc[line_data, i] for i in columns]
+            table.append(values)
+            line_data += 1
+
+        df_final = pd.DataFrame(table, columns=column_names)
+
+        # Convert all columns to scientific notation
+        pd.set_option('display.float_format', lambda x: '%.2e' % x)
+
+        # Alternatively, if you only want to convert specific columns:
+        for column in column_names:
+            df_final[column] = df_final[column].apply(lambda x: format(x, '.2e') if isinstance(x, (int, float)) else x)
+
+        return df_final
+
+    st.markdown("---")
+
+    st.markdown("**Ammonia production via SMR**")
+
+    st.write('''Amonia, ammonia, ammonia.''')
 
     ammonia_schema = ('ammonia smr.png')
     st.image(ammonia_schema, caption='')
+
+    expander = st.expander("Ammonia from SMR")
+    item_name = "ammonia production, steam reforming, liquid"
+    column_names = ["Name", "Amount", "Location", "Unit", "Category", "Type"]
+    columns = [0, 1, 2, 3, 4, 5]
+    df = extract_data('electrolyzers_LCI.xlsx', 'M1-2', item_name, columns, column_names)
+    expander.table(df)
+
+    expander = st.expander("Ammonia from hydrogen")
+    item_name = "ammonia production, hydrogen, liquid"
+    column_names = ["Name", "Amount", "Location", "Unit", "Category", "Type"]
+    columns = [0, 1, 2, 3, 4, 5]
+    df = extract_data('electrolyzers_LCI.xlsx', 'M1-2', item_name, columns, column_names)
+    expander.table(df)
 
 if __name__ == "__main__":
     main()
