@@ -77,8 +77,8 @@ def show():
         #https://re.jrc.ec.europa.eu/pvg_tools/en/    hourly data
         #"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat=45.256&lon=2.734&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=0&aspect=1&startyear=2005&endyear=2005&mountingplace=free&optimalinclination=0&optimalangles=0&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2005&hendyear=2005&trackingtype=0&hourlyangle=0&hourlyaspect=1&pvcalculation=1&pvtechchoice=crystSi&peakpower=1&loss=14"
         #URL=f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat={data[0]}&lon={data[1]}&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={elec_cap_mw * 1.3}&loss=14"
-        #URL = f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat={data[0]:.3f}&lon={data[1]:.3f}&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={pv_cap_mw *1000* 1.3}&loss=14&components=1"
-        URL = f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat=43.4928&lon=6.8555&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={pv_cap_MW*1000* 1.3}&loss=14&components=1"
+        URL = f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat={data[0]:.3f}&lon={data[1]:.3f}&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={pv_cap_MW *1000* 1.3}&loss=14&components=1"
+        #URL = f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat=43.4928&lon=6.8555&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={pv_cap_MW*1000* 1.3}&loss=14&components=1"
 
         # Create a temporary file to save the CSV data
         o = NamedTemporaryFile(suffix=".csv", delete=False)
@@ -117,12 +117,10 @@ def show():
         real_consumption = capped_values.sum()
         credit=TOTAL_power_produced-real_consumption
 
-        power_pv_year = TOTAL_power_produced / 1000  # convert to kw
-        power_pv_real = real_consumption / 1000  # convert to kw
         hours_year = 366 * 24  # 2020 has 366 days
-        necessary_power = 1000 * hours_year  # kwh
-        grid_credit = necessary_power - power_pv_year
-        grid=necessary_power - power_pv_real
+        necessary_power = elec_cap_MW*1000 * hours_year  # kwh
+        pv_credit = necessary_power - TOTAL_power_produced / 1000
+        grid=necessary_power - real_consumption / 1000
 
         percentage_grid = grid / necessary_power
         percentage_pv = 1 - percentage_grid
@@ -143,8 +141,8 @@ def show():
 
         with col2:
             # Create two columns within col2 for the table layout
-            row1_col1, row1_col2 = st.columns([1, 1])
-            row2_col1, row2_col2 = st.columns([1, 1])
+            row1_col1, row1_col2 = st.columns([4, 1])
+            row2_col1, row2_col2 = st.columns([4, 1])
 
             # Fill the first row
             row1_col1.write("percentage from grid:")
@@ -155,59 +153,80 @@ def show():
             row2_col2.write(f'<p class="right-align">{percentage_pv_real:.2%}</p>', unsafe_allow_html=True)
         #new part
 
-        df['DateTime'] = pd.to_datetime(df['DateTime'], format='%Y%m%d:%H%M')
+            df['DateTime'] = pd.to_datetime(df['DateTime'], format='%Y%m%d:%H%M')
 
-        # Extract date part and create a new column
-        df['Date'] = df['DateTime'].dt.date
+            # Extract date part and create a new column
+            df['Date'] = df['DateTime'].dt.date
 
-        # Group by the date and sum the 'elec_W' values
-        daily_sums = df.groupby('Date')['elec_W'].sum().reset_index()
-        daily_sums_24 = df.groupby('Date')['elec_W'].sum().reset_index()
+            # Group by the date and sum the 'elec_W' values
+            daily_sums = df.groupby('Date')['elec_W'].sum().reset_index()
+            daily_sums_24 = df.groupby('Date')['elec_W'].sum().reset_index()
 
-        # Rename columns for clarity
-        daily_sums.columns = ['Date', 'Total_elec_W_day']
-        daily_sums_24.columns = ['Date', 'Total_elec_W_day_24']
+            # Rename columns for clarity
+            daily_sums.columns = ['Date', 'Total_elec_W_day']
+            daily_sums_24.columns = ['Date', 'Total_elec_W_day_24']
 
-        max_value = 24000000  # Adjust this value to your desired cap
+            max_value = 24*1000000*elec_cap_MW  # Adjust this value to your desired cap
 
-        daily_sums_24['Total_elec_W_day_24'] = daily_sums_24['Total_elec_W_day_24'].clip(upper=max_value)
-        # total_sum_real_day = daily_sums_24['Total_elec_W_day_24'].sum()
-        merged_df = pd.merge(daily_sums, daily_sums_24, on='Date')
+            daily_sums_24['Total_elec_W_day_24'] = daily_sums_24['Total_elec_W_day_24'].clip(upper=max_value)
+            # total_sum_real_day = daily_sums_24['Total_elec_W_day_24'].sum()
+            merged_df = pd.merge(daily_sums, daily_sums_24, on='Date')
 
-        # Calculate the difference
-        merged_df['Difference'] = merged_df['Total_elec_W_day'] - merged_df['Total_elec_W_day_24']
+            # Calculate the difference
+            merged_df['Difference'] = merged_df['Total_elec_W_day'] - merged_df['Total_elec_W_day_24']
 
-        # Create the new DataFrame with 'Date' and 'Difference'
-        diff = merged_df[['Date', 'Difference']]
+            # Create the new DataFrame with 'Date' and 'Difference'
+            diff = merged_df[['Date', 'Difference']]
 
-        # Rename the columns if needed
-        diff.columns = ['Date', 'Total_elec_W_day_Difference']
+            # Rename the columns if needed
+            diff.columns = ['Date', 'Total_elec_W_day_Difference']
 
-        total_sum_real_year = daily_sums['Total_elec_W_day'].sum()  # =TOTAL_power_produced = df['elec_W'].sum()
-        total_sum_real_day = daily_sums_24['Total_elec_W_day_24'].sum()
-        credit_minus_daily_extra = diff['Total_elec_W_day_Difference'].sum()
-        grid_credit_daily=necessary_power-total_sum_real_day/1000
+            total_sum_real_year = daily_sums['Total_elec_W_day'].sum()  # =TOTAL_power_produced = df['elec_W'].sum()
+            total_sum_real_day = daily_sums_24['Total_elec_W_day_24'].sum()
+            credit_minus_daily_extra = diff['Total_elec_W_day_Difference'].sum()
+            pv_credit = necessary_power - TOTAL_power_produced / 1000
+            grid = necessary_power - real_consumption / 1000
+            pv_credit_daily=necessary_power-total_sum_real_day/1000
+            extra_credit_from_total_credit=credit-credit_minus_daily_extra
 
-        if credit !=0:
-            col2.write(f"During peak hours you are producing {credit/1000000:.2f}MW of extra electricity throughout the year!")
-            col2.write(f"But due to daily restrictions regarding credit generation, {(credit-credit_minus_daily_extra)/1000000:.2f}MW of extra electricity can not be allocated to PV")
-            credits_use=col2.selectbox("Will you be using the PV credits to offset the electricity from the grid?", ["Yes", "No"], index=1)
-            if credits_use == "Yes":
-                percentage_grid = grid_credit / necessary_power
-                percentage_pv = 1 - percentage_grid
 
-                percentage_grid = min(max(percentage_grid, 0), 1)
-                percentage_pv = min(max(percentage_pv, 0), 1)
+            if credit !=0:
+                col2.write(f"During peak hours you are producing {credit/1000000:.2f}MW of extra electricity throughout the year!")
+                if credit_minus_daily_extra != 0:
+                    col2.write(f"However, due to daily restrictions regarding credit generation, {(credit_minus_daily_extra)/1000000:.2f}MW of extra electricity cannot be allocated to PV")
+                credits_use=col2.selectbox("Will you be using the PV credits to offset the electricity from the grid?", ["Yes", "No"], index=1)
+                if credits_use == "Yes":
+                    percentage_grid = pv_credit / necessary_power
+                    percentage_pv = 1 - percentage_grid
 
-                col2.write(f"new percentage from grid: {percentage_grid:.2%} (no limits for credit allocation)")
-                col2.write(f"new percentage from PV: {percentage_pv:.2%} (no limits for credit allocation)")
+                    percentage_grid = min(max(percentage_grid, 0), 1)
+                    percentage_pv = min(max(percentage_pv, 0), 1)
 
-                percentage_grid_daily = grid_credit_daily / necessary_power
-                percentage_pv_daily = 1 - percentage_grid_daily
+                    row1_col1, row1_col2 = st.columns([4, 1])
+                    row2_col1, row2_col2 = st.columns([4, 1])
+                    row3_col1, row3_col2 = st.columns([4, 1])
+                    row4_col1, row4_col2 = st.columns([4, 1])
 
-                col2.write(f"newest percentage from grid: {percentage_grid_daily:.2%} (daily limits for credit allocation)")
-                col2.write(f"newest percentage from PV: {percentage_pv_daily:.2%} (daily limits for credit allocation)")
+                    # Fill the first row
+                    row1_col1.write("percentage from grid (no limits for credit allocation):")
+                    row1_col2.write(f'<p class="right-align">{percentage_grid:.2%}</p>', unsafe_allow_html=True)
 
+                    # Fill the second row
+                    row2_col1.write("percentage from PV (no limits for credit allocation):")
+                    row2_col2.write(f'<p class="right-align">{percentage_pv:.2%}</p>', unsafe_allow_html=True)
+
+                    col2.markdown("---")
+
+                    percentage_grid = pv_credit_daily / necessary_power
+                    percentage_pv = 1 - percentage_grid
+
+                    # Fill the first row
+                    row3_col1.write("percentage from grid (daily limits for credit allocation):")
+                    row3_col2.write(f'<p class="right-align">{percentage_grid:.2%}</p>', unsafe_allow_html=True)
+
+                    # Fill the second row
+                    row4_col1.write("percentage from PV (daily limits for credit allocation):")
+                    row4_col2.write(f'<p class="right-align">{percentage_pv:.2%}</p>', unsafe_allow_html=True)
 
     #Help tooltips with data from IEA for stack and efficiency
     st.markdown("""

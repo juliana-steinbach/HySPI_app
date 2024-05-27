@@ -54,7 +54,7 @@ def main():
         )
     with col3.container():
         colored_header(
-            label="CO2 data",
+            label="GHG impact",
             description="",
             color_name="blue-70",
         )
@@ -67,6 +67,8 @@ def main():
     co2_impact_hydrogen = float(total_production * co2_impact_ammonia)
     co2_impact_smr = float(total_production * co2_impact_ammonia_smr)
     difference = co2_impact_smr - co2_impact_hydrogen
+
+
 
     with col1.container():
         m = folium.Map(location=[46.903354, 2.188334], zoom_start=5)
@@ -122,10 +124,10 @@ def main():
     df.set_index("Description", inplace=True)
     df.index.name = None
 
-    with col3:
+    with col2:
         # Create two columns within col2 for the table layout
-        row1_col1, row1_col2 = st.columns(2)
-        row2_col1, row2_col2 = st.columns(2)
+        row1_col1, row1_col2 = st.columns([2, 1])
+        row2_col1, row2_col2 = st.columns([2, 1])
 
         # Fill the first row
         row1_col1.write("Total Ammonia produced in France:")
@@ -134,6 +136,8 @@ def main():
         # Fill the second row
         row2_col1.write("Selected Ammonia production:")
         row2_col2.write(f"{total_production_tons / 1499:.2%}")
+
+    with col3:
         st.table(df)
 
 
@@ -204,9 +208,14 @@ def main():
 
         return df_final
 
-    st.markdown("---")
 
-    st.markdown("**Ammonia production via SMR**")
+    st.markdown("**Ammonia production**")
+
+
+    st.write(f"GHG impact 1kg of Ammonia via SMR: {co2_impact_ammonia_smr:.2}kgC02eq")
+    st.write(f"GHG impact 1kg of Ammonia via H2: {co2_impact_ammonia:.2}kgC02eq")
+    reduction=co2_impact_ammonia/co2_impact_ammonia_smr
+    st.write(f"This represents a reduction of: {reduction:.2%}")
 
     st.write('''Amonia, ammonia, ammonia.''')
 
