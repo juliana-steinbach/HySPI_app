@@ -130,9 +130,29 @@ def show():
         percentage_grid_real = min(max(percentage_grid, 0), 1)
         percentage_pv_real = min(max(percentage_pv, 0), 1)
 
-        col2.write(f"percentage from grid: {percentage_grid_real:.2%}")
-        col2.write(f"percentage from PV: {percentage_pv_real:.2%}")
+        col2.markdown(
+            """
+            <style>
+            .right-align {
+                text-align: right !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
 
+        with col2:
+            # Create two columns within col2 for the table layout
+            row1_col1, row1_col2 = st.columns([1, 1])
+            row2_col1, row2_col2 = st.columns([1, 1])
+
+            # Fill the first row
+            row1_col1.write("percentage from grid:")
+            row1_col2.write(f'<p class="right-align">{percentage_grid_real:.2%}</p>', unsafe_allow_html=True)
+
+            # Fill the second row
+            row2_col1.write("percentage from PV:")
+            row2_col2.write(f'<p class="right-align">{percentage_pv_real:.2%}</p>', unsafe_allow_html=True)
         #new part
 
         df['DateTime'] = pd.to_datetime(df['DateTime'], format='%Y%m%d:%H%M')
@@ -158,20 +178,19 @@ def show():
         merged_df['Difference'] = merged_df['Total_elec_W_day'] - merged_df['Total_elec_W_day_24']
 
         # Create the new DataFrame with 'Date' and 'Difference'
-        diff_column = merged_df[['Date', 'Difference']]
+        diff = merged_df[['Date', 'Difference']]
 
         # Rename the columns if needed
-        diff_column.columns = ['Date', 'Total_elec_W_day_Difference']
+        diff.columns = ['Date', 'Total_elec_W_day_Difference']
 
         total_sum_real_year = daily_sums['Total_elec_W_day'].sum()  # =TOTAL_power_produced = df['elec_W'].sum()
         total_sum_real_day = daily_sums_24['Total_elec_W_day_24'].sum()
-        total_extra_not_credit = diff_column['Total_elec_W_day_Difference'].sum()
-        credit_minus_daily_extra = TOTAL_power_produced - real_consumption - total_extra_not_credit
+        credit_minus_daily_extra = diff['Total_elec_W_day_Difference'].sum()
         grid_credit_daily=necessary_power-total_sum_real_day/1000
 
         if credit !=0:
             col2.write(f"During peak hours you are producing {credit/1000000:.2f}MW of extra electricity throughout the year!")
-            col2.write(f"But due to daily restrictions regarding credit generation, {total_extra_not_credit/1000000:.2f}MW of extra electricity can not be allocated to PV")
+            col2.write(f"But due to daily restrictions regarding credit generation, {(credit-credit_minus_daily_extra)/1000000:.2f}MW of extra electricity can not be allocated to PV")
             credits_use=col2.selectbox("Will you be using the PV credits to offset the electricity from the grid?", ["Yes", "No"], index=1)
             if credits_use == "Yes":
                 percentage_grid = grid_credit / necessary_power

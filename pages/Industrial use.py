@@ -121,9 +121,20 @@ def main():
     df = pd.DataFrame(data)
     df.set_index("Description", inplace=True)
     df.index.name = None
-    col3.write("Total Ammonia produced in France: 1500t")
-    col3.write(f"Selected Ammonia production: {total_production_tons / 1499:.2%}")
-    col3.table(df)
+
+    with col3:
+        # Create two columns within col2 for the table layout
+        row1_col1, row1_col2 = st.columns(2)
+        row2_col1, row2_col2 = st.columns(2)
+
+        # Fill the first row
+        row1_col1.write("Total Ammonia produced in France:")
+        row1_col2.write("1500t")
+
+        # Fill the second row
+        row2_col1.write("Selected Ammonia production:")
+        row2_col2.write(f"{total_production_tons / 1499:.2%}")
+        st.table(df)
 
 
     if map["last_object_clicked"] != st.session_state.get("last_object_clicked"):

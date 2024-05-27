@@ -68,13 +68,13 @@ diff_column.columns = ['Date', 'Total_elec_W_day_Difference']
 
 total_sum_real_year = daily_sums['Total_elec_W_day'].sum() #=TOTAL_power_produced = df['elec_W'].sum()
 total_sum_real_day = daily_sums_24['Total_elec_W_day_24'].sum()
-total_extra_not_credit = diff_column['Total_elec_W_day_Difference'].sum()
+credit_minus_daily_extra = diff_column['Total_elec_W_day_Difference'].sum()
 
 TOTAL_power_produced = df['elec_W'].sum()
 capped_values = df['elec_W'].clip(upper=1*1000000)
 real_consumption = capped_values.sum()
 credit=TOTAL_power_produced-real_consumption
-credit_minus_daily_extra = TOTAL_power_produced - real_consumption - total_extra_not_credit
+
 
 print(daily_sums)
 print(daily_sums_24)
@@ -83,7 +83,6 @@ print(total_sum_real_year)
 print(total_sum_real_day)
 print(TOTAL_power_produced)
 print(real_consumption)
-print(total_extra_not_credit)
 print(f"credit: {credit}")
 print(f"not credit: {credit_minus_daily_extra}")
 
