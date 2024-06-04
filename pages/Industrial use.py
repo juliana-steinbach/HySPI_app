@@ -215,7 +215,7 @@ def main():
     st.write(f"GHG impact 1kg of Ammonia via SMR: {co2_impact_ammonia_smr:.2}kgC02eq")
     st.write(f"GHG impact 1kg of Ammonia via H2: {co2_impact_ammonia:.2}kgC02eq")
     reduction=co2_impact_ammonia/co2_impact_ammonia_smr
-    st.write(f"This represents a reduction of: {reduction:.2%}")
+    st.write(f"This represents a reduction of: {1-reduction:.2%}")
 
     st.write('''Amonia, ammonia, ammonia.''')
 

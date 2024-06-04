@@ -7,6 +7,7 @@ from urllib.request import urlopen
 from tempfile import NamedTemporaryFile
 from streamlit_extras.colored_header import colored_header
 import time
+from opencage.geocoder import OpenCageGeocode
 
 
 def show():
@@ -29,47 +30,271 @@ def show():
     col1, col2, col3 = st.columns([1, 1, 1])
 
     #Forefround questions
-    stack_type = col1.selectbox("Select the electrolyzer stack:", ["PEM", "AEC"])
-    elec_cap_MW = col2.number_input("Select the electrolyzer capacity (MW):", value=1, min_value=1, step=1)
-    stack_LT = col3.number_input("Select the stack lifetime (h):", value=120000, min_value=1, step=1)
-    BoP_LT_y = col1.number_input("Select the BoP lifetime (years):", value=20, min_value=1, step=1)
-    eff = col2.number_input("Select the stack efficiency (0 to 1):", value=0.72, min_value=0.0, max_value=1.0, step=0.01)
-    cf = col3.number_input("Select the capacity factor (0 to 1):", value=0.9, min_value=0.01, step=0.05)
-    transp = col3.selectbox("How is hydrogen going to be transported?", ["Pipeline", "Truck"], index=1)
-    renewable_coupling = col1.selectbox("Will your plant include solar panels?", ["Yes", "No"], index=1)
-    storage_choice = col2.selectbox("How is hydrogen going to be stored?", ["Tank", "No storage"], index=1)
+    stack_type = col1.selectbox("Electrolyzer stack:", ["PEM", "AEC"])
+    elec_cap_MW = col2.number_input("Electrolyzer capacity (MW):", value=1, min_value=1, step=1)
+    stack_LT = col3.number_input("Stack lifetime (h):", value=120000, min_value=1, step=1)
+    BoP_LT_y = col1.number_input("Balance of Plant lifetime (years):", value=20, min_value=1, step=1)
+    eff = col2.number_input("Stack efficiency (0 to 1):", value=0.72, min_value=0.0, max_value=1.0, step=0.01)
+    cf = col3.number_input("Capacity factor (0 to 1):", value=0.9, min_value=0.01, max_value=1.00, step=0.05)
+    transp = col3.selectbox("Transport method", ["Pipeline", "Truck"], index=1)
+    renewable_coupling = col1.selectbox("Photovoltaic coupled?", ["Yes", "No"], index=1)
+    storage_choice = col2.selectbox("Storage", ["Tank", "No storage"], index=1)
+
+    elec_cap = elec_cap_MW*1000
+    BoP_LT_h = BoP_LT_y * 365 * 24
+    Electricity_consumed = BoP_LT_h * cf * elec_cap
+    Ec = int(Electricity_consumed)
+    Ec_MWh = Ec / 1000 # Convert kWh to MWh
+    Ec_GWh = Ec / 1000000  # Convert kWh to GWh
+
+    # Help tooltips with data from IEA for stack and efficiency
+    st.markdown("""
+                <style>
+                    /* Importando o CSS do Font Awesome */
+                    @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css');
+                </style>
+            """, unsafe_allow_html=True)
+
+    tooltip_html = """
+                <div class="tooltip">
+                    <span class="tooltiptext">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th colspan='2'>AEC</th>
+                                    <th colspan='2'>PEM</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td></td><td>Current,&nbsp;2019</td><td>Future,&nbsp;2050</td><td>Current,&nbsp;2019</td><td>Future,&nbsp;2050</td></tr>
+                                <tr><td>Stack lifetime (operating hours)</td><td>60000-90000</td><td>100000-150000</td><td>30000-90000</td><td>100000-150000</td></tr>
+                            </tbody>
+                        </table>
+                        <p>source: IEA, The Future of Hydrogen - Seizing today’s opportunities, International Energy Agency, 2019.</p>
+                    </span>
+                    <span id="tooltip_trigger">Need help with prospective Stack lifetime data? Check this info  <i class="fas fa-lightbulb"></i></span>
+                </div>
+            """
+
+    st.markdown(f'{tooltip_html}', unsafe_allow_html=True)
+
+    # JavaScript and CSS to show tooltip
+    js_code = """
+            <script>
+                // Add event listener to show tooltip on mouseover
+                document.getElementById("tooltip_trigger").addEventListener("mouseover", function() {
+                    var tooltipText = document.querySelector(".tooltiptext");
+                    tooltipText.style.visibility = "visible";
+                });
+
+                // Add event listener to hide tooltip on mouseout
+                document.getElementById("tooltip_trigger").addEventListener("mouseout", function() {
+                    var tooltipText = document.querySelector(".tooltiptext");
+                    tooltipText.style.visibility = "hidden";
+                });
+            </script>
+            """
+
+    css_code = """
+            <style>
+                .tooltip {
+                    position: relative;
+                    display: inline-block;
+                    cursor: help;
+                }
+
+                .tooltiptext {
+                    visibility: hidden;
+                    width: 800px;
+                    background-color: white;
+                    color: black;
+                    text-align: left;
+                    border-radius: 6px;
+                    padding: 10px;
+                    position: absolute;
+                    z-index: 1;
+                    top: 125%;
+                    left: 0;
+                    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+                    opacity: 1; /* Make the tooltip non-transparent */
+                }
+
+                .tooltip:hover .tooltiptext {
+                    visibility: visible;
+                }
+            </style>
+            """
+
+    # Define the HTML content for the tooltip
+    tooltip_html2 = """
+                <div class="tooltip">
+                    <span class="tooltiptext">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th colspan='2'>AEC</th>
+                                    <th colspan='2'>PEM</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td></td><td>Current,&nbsp;2019</td><td>Future,&nbsp;2050</td><td>Current,&nbsp;2019</td><td>Future,&nbsp;2050</td></tr>
+                                <tr><td>Electrical efficiency (%LHV)</td><td>63-70</td><td>70-80</td><td>56-60</td><td>67-74</td></tr>
+                            </tbody>
+                        </table>
+                        <p>source: IEA, The Future of Hydrogen - Seizing today’s opportunities, International Energy Agency, 2019.</p>
+                    </span>
+                    <span id="tooltip_trigger">Need help with prospective Stack efficiency data? Check this info  <i class="fas fa-lightbulb"></i></span>
+                </div>
+            """
+
+    st.markdown(f'{tooltip_html2}', unsafe_allow_html=True)
+
+    # JavaScript and CSS to show tooltip
+    js_code = """
+            <script>
+                // Add event listener to show tooltip on mouseover
+                document.getElementById("tooltip_trigger").addEventListener("mouseover", function() {
+                    var tooltipText = document.querySelector(".tooltiptext");
+                    tooltipText.style.visibility = "visible";
+                });
+
+                // Add event listener to hide tooltip on mouseout
+                document.getElementById("tooltip_trigger").addEventListener("mouseout", function() {
+                    var tooltipText = document.querySelector(".tooltiptext");
+                    tooltipText.style.visibility = "hidden";
+                });
+            </script>
+            """
+
+    css_code = """
+            <style>
+                .tooltip {
+                    position: relative;
+                    display: inline-block;
+                    cursor: help;
+                }
+
+                .tooltiptext {
+                    visibility: hidden;
+                    width: 700px;
+                    background-color: white;
+                    color: black;
+                    text-align: left;
+                    border-radius: 6px;
+                    padding: 10px;
+                    position: absolute;
+                    z-index: 1;
+                    top: 125%;
+                    left: 0;
+                    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+                    opacity: 1; /* Make the tooltip non-transparent */
+                }
+
+                .tooltip:hover .tooltiptext {
+                    visibility: visible;
+                }
+            </style>
+            """
+
+    # Add JavaScript and CSS to the page
+    st.markdown(js_code, unsafe_allow_html=True)
+    st.markdown(css_code, unsafe_allow_html=True)
+
+    import streamlit as st
+    from opencage.geocoder import OpenCageGeocode
+    import folium
+    from streamlit_folium import st_folium
 
     data = None  # Initialize data with a default value
 
+    # Initialize OpenCage geocoder with your API key
+    API_KEY = '8dd1a5bd80ce401a8fee652c805092cc'
+    geocoder = OpenCageGeocode(API_KEY)
+
+    def get_pos(lat, lng):
+        return lat, lng
+
+    def get_city_coordinates(city_name):
+        query = f'{city_name}, France'
+        results = geocoder.geocode(query)
+        if results and len(results):
+            return results[0]['geometry']['lat'], results[0]['geometry']['lng']
+        else:
+            return None
+
+    # Initialize session state variables
+    if 'data' not in st.session_state:
+        st.session_state.data = None
+    if 'city_selected' not in st.session_state:
+        st.session_state.city_selected = False
+    if 'map_selected' not in st.session_state:
+        st.session_state.map_selected = False
+    if 'use_map' not in st.session_state:
+        st.session_state.use_map = False
+
     if renewable_coupling == "Yes":
+        colored_header(
+            label="Photovoltaic system",
+            description="Select the location and PV capacity",
+            color_name="blue-70",
+        )
         with st.container():
-            col1, col2 = st.columns([1, 1])
-            col1.write("### Pick a location on the map")
-            col2.write("### PV share")
-            pv_cap_MW = col2.number_input("Select the PV farm capacity (MW):", value=1.0, min_value=0.1,max_value=1000000.0, step=0.1)
-
-
-
+            col1, col2 = st.columns([2,4])
+            col1.write("### Pick a location")
+            col2.write("### PV capacity")
             with col1:
-                def get_pos(lat, lng):
-                    return lat, lng
+                if not st.session_state.use_map:
+                    city_name = st.text_input("Enter city name:")
+                    if city_name:
+                        coordinates = get_city_coordinates(city_name)
+                        if coordinates:
+                            st.session_state.data = coordinates  # Update selected data
+                            st.session_state.city_selected = True
+                            st.session_state.map_selected = False
+                            st.session_state['last_clicked'] = None  # Clear map selection
+                            data = coordinates
+                        else:
+                            st.error("City not found. Please enter a valid city name in France.")
+                            st.session_state.city_selected = False
+                    st.write("")
+                    st.write("Prefer to pick on the map?")
+                    if st.button("Click here to select a city on the map."):
+                        st.session_state.use_map = True
+                        st.session_state.city_selected = False
+                        st.session_state['last_clicked'] = None  # Clear map selection
+                        st.experimental_rerun()  # Force immediate rerun to update UI
 
-                if 'markers1' not in st.session_state:
-                    st.session_state.markers1 = []
-                if 'markers2' not in st.session_state:
-                    st.session_state.markers2 = []
-                # Create a Folium map
-                m = folium.Map(location=[46.903354, 2.088334], zoom_start=5)
-                m.add_child(folium.LatLngPopup())
+                else:
+                    # Create a Folium map
+                    m = folium.Map(location=[46.903354, 2.088334], zoom_start=5)
+                    m.add_child(folium.LatLngPopup())
 
-                # When the user interacts with the map
-                map = st_folium(
-                    m,
-                    width=400, height=420,
-                    key="folium_map"
-                )
-                if map.get("last_clicked"):
-                    data = get_pos(map["last_clicked"]["lat"], map["last_clicked"]["lng"])
+                    # When the user interacts with the map
+                    map = st_folium(
+                        m,
+                        width=300, height=340,
+                        key="folium_map"
+                    )
+
+                    if map.get("last_clicked"):
+                        st.session_state['last_clicked'] = [map["last_clicked"]["lat"], map["last_clicked"]["lng"]]
+                        data = get_pos(map["last_clicked"]["lat"], map["last_clicked"]["lng"])
+                        st.session_state.data = data  # Update selected data
+                        st.session_state.map_selected = True
+                        st.session_state.city_selected = False  # Clear city selection
+                    st.write("Prefer to type a city name?")
+                    if st.button("Click here to enter a city name."):
+                        st.session_state.use_map = False
+                        st.session_state.map_selected = False
+                        st.session_state['last_clicked'] = None  # Clear map selection
+                        st.experimental_rerun()  # Force immediate rerun to update UI
+
+            with col2:
+                col3, col4 = st.columns([1,1])
+                pv_cap_MW = col3.number_input("Select the PV farm capacity (MW):", value=1.0, min_value=0.1,
+                                          max_value=1000000.0, step=0.1)
 
     if data is not None:
 
@@ -118,7 +343,7 @@ def show():
         credit=TOTAL_power_produced-real_consumption
 
         hours_year = 366 * 24  # 2020 has 366 days
-        necessary_power = elec_cap_MW*1000 * hours_year  # kwh
+        necessary_power = elec_cap_MW*cf*1000 * hours_year  # kwh here we add the capacity factor
         pv_credit = necessary_power - TOTAL_power_produced / 1000
         grid=necessary_power - real_consumption / 1000
 
@@ -128,31 +353,7 @@ def show():
         percentage_grid_real = min(max(percentage_grid, 0), 1)
         percentage_pv_real = min(max(percentage_pv, 0), 1)
 
-        col2.markdown(
-            """
-            <style>
-            .right-align {
-                text-align: right !important;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True
-        )
-
         with col2:
-            # Create two columns within col2 for the table layout
-            row1_col1, row1_col2 = st.columns([4, 1])
-            row2_col1, row2_col2 = st.columns([4, 1])
-
-            # Fill the first row
-            row1_col1.write("percentage from grid:")
-            row1_col2.write(f'<p class="right-align">{percentage_grid_real:.2%}</p>', unsafe_allow_html=True)
-
-            # Fill the second row
-            row2_col1.write("percentage from PV:")
-            row2_col2.write(f'<p class="right-align">{percentage_pv_real:.2%}</p>', unsafe_allow_html=True)
-        #new part
-
             df['DateTime'] = pd.to_datetime(df['DateTime'], format='%Y%m%d:%H%M')
 
             # Extract date part and create a new column
@@ -166,7 +367,7 @@ def show():
             daily_sums.columns = ['Date', 'Total_elec_W_day']
             daily_sums_24.columns = ['Date', 'Total_elec_W_day_24']
 
-            max_value = 24*1000000*elec_cap_MW  # Adjust this value to your desired cap
+            max_value = 24*1000000*elec_cap_MW*cf  # Adjust this value to your desired cap
 
             daily_sums_24['Total_elec_W_day_24'] = daily_sums_24['Total_elec_W_day_24'].clip(upper=max_value)
             # total_sum_real_day = daily_sums_24['Total_elec_W_day_24'].sum()
@@ -189,199 +390,62 @@ def show():
             pv_credit_daily=necessary_power-total_sum_real_day/1000
             extra_credit_from_total_credit=credit-credit_minus_daily_extra
 
+            row0_col1, row0_col2 = st.columns([3, 1])
+            row1_col1, row1_col2 = st.columns([3, 1])
+            row2_col1, row2_col2 = st.columns([3, 1])
+            row3_col1, row3_col2 = st.columns([3, 1])
+
+            row0_col1.write(f"Electrolyzer's electricity consumption: ")
+            row0_col2.markdown(f":blue-background[{Ec_MWh / BoP_LT_y: .2f}MWh/year]", unsafe_allow_html=True)
+
+            row1_col1.write("PV electricity production:")
+            row1_col2.markdown(f" :blue-background[{TOTAL_power_produced/1000000:.2f} MWh/year]", unsafe_allow_html=True)
 
             if credit !=0:
-                col2.write(f"During peak hours you are producing {credit/1000000:.2f}MW of extra electricity throughout the year!")
+                row2_col1.write("PV extra electricity produced:")
+                row2_col2.markdown(f" :blue-background[{credit / 1000000:.2f} MWh/year]", unsafe_allow_html=True)
                 if credit_minus_daily_extra != 0:
-                    col2.write(f"However, due to daily restrictions regarding credit generation, {(credit_minus_daily_extra)/1000000:.2f}MW of extra electricity cannot be allocated to PV")
-                credits_use=col2.selectbox("Will you be using the PV credits to offset the electricity from the grid?", ["Yes", "No"], index=1)
-                if credits_use == "Yes":
-                    percentage_grid = pv_credit / necessary_power
-                    percentage_pv = 1 - percentage_grid
+                    row3_col1.write("PV extra electricity produced (daily cap):")
+                    row3_col2.markdown(f":blue-background[{(credit-credit_minus_daily_extra)/1000000:.2f}MWh/year]", unsafe_allow_html=True)
 
-                    percentage_grid = min(max(percentage_grid, 0), 1)
-                    percentage_pv = min(max(percentage_pv, 0), 1)
+                col2.write("##### Select an impact allocation option for electricity:")
 
-                    row1_col1, row1_col2 = st.columns([4, 1])
-                    row2_col1, row2_col2 = st.columns([4, 1])
-                    row3_col1, row3_col2 = st.columns([4, 1])
-                    row4_col1, row4_col2 = st.columns([4, 1])
+                row4_col1, row4_col2, row4_col3 = st.columns([2, 2, 1])
+                row5_col1, row5_col2, row5_col3 = st.columns([2, 2, 1])
+                col2.write("")
+                row6_col1, row6_col2, row6_col3 = st.columns([2, 2, 1])
+                row7_col1, row7_col2, row7_col3 = st.columns([2, 2, 1])
+                col2.write("")
+                row8_col1, row8_col2, row8_col3 = st.columns([2, 2, 1])
+                row9_col1, row9_col2, row9_col3 = st.columns([2, 2, 1])
 
-                    # Fill the first row
-                    row1_col1.write("percentage from grid (no limits for credit allocation):")
-                    row1_col2.write(f'<p class="right-align">{percentage_grid:.2%}</p>', unsafe_allow_html=True)
+                row4_col2.write(":gray-background[Grid (real consumption):]")
+                row4_col3.write(f'<p class="right-align">{percentage_grid_real:.2%}</p>', unsafe_allow_html=True)
 
-                    # Fill the second row
-                    row2_col1.write("percentage from PV (no limits for credit allocation):")
-                    row2_col2.write(f'<p class="right-align">{percentage_pv:.2%}</p>', unsafe_allow_html=True)
+                row5_col2.write(":gray-background[PV (real consumption):]")
+                row5_col3.write(f'<p class="right-align">{percentage_pv_real:.2%}</p>', unsafe_allow_html=True)
 
-                    col2.markdown("---")
+                percentage_grid = pv_credit / necessary_power
+                percentage_pv = 1 - percentage_grid
 
-                    percentage_grid = pv_credit_daily / necessary_power
-                    percentage_pv = 1 - percentage_grid
+                percentage_grid = min(max(percentage_grid, 0), 1)
+                percentage_pv = min(max(percentage_pv, 0), 1)
 
-                    # Fill the first row
-                    row3_col1.write("percentage from grid (daily limits for credit allocation):")
-                    row3_col2.write(f'<p class="right-align">{percentage_grid:.2%}</p>', unsafe_allow_html=True)
+                row6_col2.write(":blue-background[Grid - PV credit:]")
+                row6_col3.write(f'<p class="right-align">{percentage_grid:.2%}</p>', unsafe_allow_html=True)
 
-                    # Fill the second row
-                    row4_col1.write("percentage from PV (daily limits for credit allocation):")
-                    row4_col2.write(f'<p class="right-align">{percentage_pv:.2%}</p>', unsafe_allow_html=True)
+                row7_col2.write(":blue-background[PV + PV credit:]")
+                row7_col3.write(f'<p class="right-align">{percentage_pv:.2%}</p>', unsafe_allow_html=True)
 
-    #Help tooltips with data from IEA for stack and efficiency
-    st.markdown("""
-            <style>
-                /* Importando o CSS do Font Awesome */
-                @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css');
-            </style>
-        """, unsafe_allow_html=True)
+                percentage_grid = pv_credit_daily / necessary_power
+                percentage_pv = 1 - percentage_grid
 
-    tooltip_html = """
-            <div class="tooltip">
-                <span class="tooltiptext">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th></th>
-                                <th colspan='2'>AEC</th>
-                                <th colspan='2'>PEM</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr><td></td><td>Current,&nbsp;2019</td><td>Future,&nbsp;2050</td><td>Current,&nbsp;2019</td><td>Future,&nbsp;2050</td></tr>
-                            <tr><td>Stack lifetime (operating hours)</td><td>60000-90000</td><td>100000-150000</td><td>30000-90000</td><td>100000-150000</td></tr>
-                        </tbody>
-                    </table>
-                    <p>source: IEA, The Future of Hydrogen - Seizing today’s opportunities, International Energy Agency, 2019.</p>
-                </span>
-                <span id="tooltip_trigger">Need help with prospective Stack lifetime data? Check this info  <i class="fas fa-lightbulb"></i></span>
-            </div>
-        """
+                if credit_minus_daily_extra != 0:
+                    row8_col2.write(":gray-background[Grid - daily PV credit:]")
+                    row8_col3.write(f'<p class="right-align">{percentage_grid:.2%}</p>', unsafe_allow_html=True)
 
-    st.markdown(f'{tooltip_html}', unsafe_allow_html=True)
-
-    # JavaScript and CSS to show tooltip
-    js_code = """
-        <script>
-            // Add event listener to show tooltip on mouseover
-            document.getElementById("tooltip_trigger").addEventListener("mouseover", function() {
-                var tooltipText = document.querySelector(".tooltiptext");
-                tooltipText.style.visibility = "visible";
-            });
-
-            // Add event listener to hide tooltip on mouseout
-            document.getElementById("tooltip_trigger").addEventListener("mouseout", function() {
-                var tooltipText = document.querySelector(".tooltiptext");
-                tooltipText.style.visibility = "hidden";
-            });
-        </script>
-        """
-
-    css_code = """
-        <style>
-            .tooltip {
-                position: relative;
-                display: inline-block;
-                cursor: help;
-            }
-
-            .tooltiptext {
-                visibility: hidden;
-                width: 800px;
-                background-color: white;
-                color: black;
-                text-align: left;
-                border-radius: 6px;
-                padding: 10px;
-                position: absolute;
-                z-index: 1;
-                top: 125%;
-                left: 0;
-                box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
-                opacity: 1; /* Make the tooltip non-transparent */
-            }
-
-            .tooltip:hover .tooltiptext {
-                visibility: visible;
-            }
-        </style>
-        """
-
-    # Define the HTML content for the tooltip
-    tooltip_html2 = """
-            <div class="tooltip">
-                <span class="tooltiptext">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th></th>
-                                <th colspan='2'>AEC</th>
-                                <th colspan='2'>PEM</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr><td></td><td>Current,&nbsp;2019</td><td>Future,&nbsp;2050</td><td>Current,&nbsp;2019</td><td>Future,&nbsp;2050</td></tr>
-                            <tr><td>Electrical efficiency (%LHV)</td><td>63-70</td><td>70-80</td><td>56-60</td><td>67-74</td></tr>
-                        </tbody>
-                    </table>
-                    <p>source: IEA, The Future of Hydrogen - Seizing today’s opportunities, International Energy Agency, 2019.</p>
-                </span>
-                <span id="tooltip_trigger">Need help with prospective Stack efficiency data? Check this info  <i class="fas fa-lightbulb"></i></span>
-            </div>
-        """
-
-    st.markdown(f'{tooltip_html2}', unsafe_allow_html=True)
-
-    # JavaScript and CSS to show tooltip
-    js_code = """
-        <script>
-            // Add event listener to show tooltip on mouseover
-            document.getElementById("tooltip_trigger").addEventListener("mouseover", function() {
-                var tooltipText = document.querySelector(".tooltiptext");
-                tooltipText.style.visibility = "visible";
-            });
-
-            // Add event listener to hide tooltip on mouseout
-            document.getElementById("tooltip_trigger").addEventListener("mouseout", function() {
-                var tooltipText = document.querySelector(".tooltiptext");
-                tooltipText.style.visibility = "hidden";
-            });
-        </script>
-        """
-
-    css_code = """
-        <style>
-            .tooltip {
-                position: relative;
-                display: inline-block;
-                cursor: help;
-            }
-
-            .tooltiptext {
-                visibility: hidden;
-                width: 700px;
-                background-color: white;
-                color: black;
-                text-align: left;
-                border-radius: 6px;
-                padding: 10px;
-                position: absolute;
-                z-index: 1;
-                top: 125%;
-                left: 0;
-                box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
-                opacity: 1; /* Make the tooltip non-transparent */
-            }
-
-            .tooltip:hover .tooltiptext {
-                visibility: visible;
-            }
-        </style>
-        """
-
-    # Add JavaScript and CSS to the page
-    st.markdown(js_code, unsafe_allow_html=True)
-    st.markdown(css_code, unsafe_allow_html=True)
+                    row9_col2.write(":gray-background[PV + daily PV credit:]")
+                    row9_col3.write(f'<p class="right-align">{percentage_pv:.2%}</p>', unsafe_allow_html=True)
 
     #Indication for background before the data
     colored_header(
@@ -389,7 +453,6 @@ def show():
         description="Electricity scenarios",
         color_name="blue-70",
     )
-
 
     col4, col5, col6, col7 = st.columns([1, 1, 1, 1])
 
@@ -663,17 +726,6 @@ def show():
     bop_activity = agb.findActivity(name=activity_names[stack_type]['BoP'], db_name='AEC/PEM')
     t_Stack_activity = negAct(agb.findActivity(name=activity_names[stack_type]['Treatment_Stack'], db_name='AEC/PEM'))
     t_BoP_activity = negAct(agb.findActivity(name=activity_names[stack_type]['Treatment_BoP'], db_name='AEC/PEM'))
-
-    #convert electrolyzer capacity to kW
-    elec_cap = elec_cap_MW*1000
-
-    # BoP lifetime
-    BoP_LT_h = BoP_LT_y * 365 * 24
-
-    # capacity factor
-    Electricity_consumed = BoP_LT_h * cf * elec_cap
-    Ec = int(Electricity_consumed)
-    Ec_GWh = Ec / 1000000  # Convert kWh to GWh
 
     # Higher heating value
     HHV = 39.4  # kWh/kg
