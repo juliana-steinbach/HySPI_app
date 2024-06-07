@@ -46,6 +46,10 @@ def show():
     Ec = int(Electricity_consumed)
     Ec_MWh = Ec / 1000 # Convert kWh to MWh
     Ec_GWh = Ec / 1000000  # Convert kWh to GWh
+    # Higher heating value
+    HHV = 39.4  # kWh/kg
+
+    H2_year = 365 * 24 * cf * elec_cap * eff / HHV
 
     # Help tooltips with data from IEA for stack and efficiency
     st.markdown("""
@@ -77,7 +81,6 @@ def show():
                 </div>
             """
 
-    st.markdown(f'{tooltip_html}', unsafe_allow_html=True)
 
     # JavaScript and CSS to show tooltip
     js_code = """
@@ -149,7 +152,13 @@ def show():
                 </div>
             """
 
-    st.markdown(f'{tooltip_html2}', unsafe_allow_html=True)
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        st.markdown(f'{tooltip_html}', unsafe_allow_html=True)
+        st.markdown(f'{tooltip_html2}', unsafe_allow_html=True)
+    with col2:
+        st.write("")
+        st.write(f"Hydrogen production: {H2_year/1000:.2f}t/year")
 
     # JavaScript and CSS to show tooltip
     js_code = """
@@ -202,101 +211,87 @@ def show():
     st.markdown(js_code, unsafe_allow_html=True)
     st.markdown(css_code, unsafe_allow_html=True)
 
-    import streamlit as st
-    from opencage.geocoder import OpenCageGeocode
-    import folium
-    from streamlit_folium import st_folium
-
     data = None  # Initialize data with a default value
-
-    # Initialize OpenCage geocoder with your API key
-    API_KEY = '8dd1a5bd80ce401a8fee652c805092cc'
-    geocoder = OpenCageGeocode(API_KEY)
-
-    def get_pos(lat, lng):
-        return lat, lng
-
-    def get_city_coordinates(city_name):
-        query = f'{city_name}, France'
-        results = geocoder.geocode(query)
-        if results and len(results):
-            return results[0]['geometry']['lat'], results[0]['geometry']['lng']
-        else:
-            return None
-
-    # Initialize session state variables
-    if 'data' not in st.session_state:
-        st.session_state.data = None
-    if 'city_selected' not in st.session_state:
-        st.session_state.city_selected = False
-    if 'map_selected' not in st.session_state:
-        st.session_state.map_selected = False
-    if 'use_map' not in st.session_state:
-        st.session_state.use_map = False
-
     if renewable_coupling == "Yes":
         colored_header(
             label="Photovoltaic system",
             description="Select the location and PV capacity",
             color_name="blue-70",
         )
+
+        import streamlit as st
+        from opencage.geocoder import OpenCageGeocode
+        import folium
+        from streamlit_folium import st_folium
+
+        if 'data' not in st.session_state:
+            st.session_state["last_clicked"]=""
+        if 'data' not in st.session_state:
+            st.session_state["latlon"]=""
+        if 'data' not in st.session_state:
+            st.session_state["city_name"]=""
+
+
+        # Initialize OpenCage geocoder with your API key
+        API_KEY = '8dd1a5bd80ce401a8fee652c805092cc'
+        geocoder = OpenCageGeocode(API_KEY)
+
+        def get_pos(lat, lng):
+            return lat, lng
+
+        def get_city_coordinates(city_name):
+            query = f'{city_name}, France'
+            results = geocoder.geocode(query)
+            if results and len(results):
+                return results[0]['geometry']['lat'], results[0]['geometry']['lng']
+            else:
+                return None
+
         with st.container():
-            col1, col2 = st.columns([2,4])
-            col1.write("### Pick a location")
-            col2.write("### PV capacity")
+            col1, col2, col3= st.columns([3, 5, 1])
+            col1.write("#### Enter a location or select one on the map")
+
             with col1:
-                if not st.session_state.use_map:
-                    city_name = st.text_input("Enter city name:")
-                    if city_name:
-                        coordinates = get_city_coordinates(city_name)
-                        if coordinates:
-                            st.session_state.data = coordinates  # Update selected data
-                            st.session_state.city_selected = True
-                            st.session_state.map_selected = False
-                            st.session_state['last_clicked'] = None  # Clear map selection
-                            data = coordinates
-                        else:
-                            st.error("City not found. Please enter a valid city name in France.")
-                            st.session_state.city_selected = False
-                    st.write("")
-                    st.write("Prefer to pick on the map?")
-                    if st.button("Click here to select a city on the map."):
-                        st.session_state.use_map = True
-                        st.session_state.city_selected = False
-                        st.session_state['last_clicked'] = None  # Clear map selection
-                        st.experimental_rerun()  # Force immediate rerun to update UI
+                city_name = st.text_input("Enter city name:")
+                st.write("or")
+                latlon = st.text_input("Enter latitude and longitude (comma-separated):",
+                                       placeholder="e.g.: 43.4380714, 4.945595", type="default")
+                if latlon:
+                    city_lat, city_lon = map(float, latlon.split(','))
 
-                else:
-                    # Create a Folium map
-                    m = folium.Map(location=[46.903354, 2.088334], zoom_start=5)
-                    m.add_child(folium.LatLngPopup())
+            # Create a Folium map
+            m = folium.Map(location=[46.903354, 2.088334], zoom_start=5)
+            m.add_child(folium.LatLngPopup())
 
-                    # When the user interacts with the map
-                    map = st_folium(
-                        m,
-                        width=300, height=340,
-                        key="folium_map"
-                    )
+            if city_name:  # Check if city name is entered
+                data = get_city_coordinates(city_name)
+                if data:
+                    folium.Marker(location=data).add_to(m)
 
-                    if map.get("last_clicked"):
-                        st.session_state['last_clicked'] = [map["last_clicked"]["lat"], map["last_clicked"]["lng"]]
-                        data = get_pos(map["last_clicked"]["lat"], map["last_clicked"]["lng"])
-                        st.session_state.data = data  # Update selected data
-                        st.session_state.map_selected = True
-                        st.session_state.city_selected = False  # Clear city selection
-                    st.write("Prefer to type a city name?")
-                    if st.button("Click here to enter a city name."):
-                        st.session_state.use_map = False
-                        st.session_state.map_selected = False
-                        st.session_state['last_clicked'] = None  # Clear map selection
-                        st.experimental_rerun()  # Force immediate rerun to update UI
+            if latlon:  # Check if latitude and longitude are entered
+                data = (city_lat, city_lon)
+                folium.Marker(location=data).add_to(m)
 
             with col2:
-                col3, col4 = st.columns([1,1])
-                pv_cap_MW = col3.number_input("Select the PV farm capacity (MW):", value=1.0, min_value=0.1,
-                                          max_value=1000000.0, step=0.1)
+                # When the user interacts with the map
+                map_data = st_folium(
+                    m,
+                    width=330, height=350,
+                    key="folium_map"
+                )
+
+                if map_data.get("last_clicked"):
+                    data = get_pos(map_data["last_clicked"]["lat"], map_data["last_clicked"]["lng"])
+                    folium.Marker(location=data).add_to(m)
+
+
+            col1.write(f"#### Location selected: {data}")
+        st.markdown("---")
 
     if data is not None:
+        col1, col2 = st.columns([1, 1])
+        pv_cap_MW = col1.number_input("Select the PV farm capacity (MW):", value=1.0, min_value=0.1,
+                                      max_value=1000000.0, step=0.1)
 
         #https: // re.jrc.ec.europa.eu / api / v5_2 / seriescalc?lat = 43.667 & lon = 5.596 & raddatabase = PVGIS - SARAH2 & browser = 1 & outputformat = csv & userhorizon = & usehorizon = 1 & angle = & aspect = & startyear = 2020 & endyear = 2020 & mountingplace = free & optimalinclination = 0 & optimalangles = 1 & js = 1 & select_database_hourly = PVGIS - SARAH2 & hstartyear = 2020 & hendyear = 2020 & trackingtype = 0 & hourlyoptimalangles = 1 & pvcalculation = 1 & pvtechchoice = crystSi & peakpower = 1300 & loss = 14 & components = 1
         #https://re.jrc.ec.europa.eu/pvg_tools/en/    hourly data
@@ -330,7 +325,6 @@ def show():
                     if len(columns) >= 2:
                         data2.append([columns[0], columns[1]])
 
-        # Create a DataFrame from the data and name the columns
         df = pd.DataFrame(data2, columns=header)
 
         # Convert 'elec_W' column to numeric, handling possible conversion issues
@@ -338,14 +332,14 @@ def show():
 
         # Sum of all elec_W figures
         TOTAL_power_produced = df['elec_W'].sum()
-        capped_values = df['elec_W'].clip(upper=elec_cap_MW*1000000)
+        capped_values = df['elec_W'].clip(upper=elec_cap_MW * 1000000)
         real_consumption = capped_values.sum()
-        credit=TOTAL_power_produced-real_consumption
+        credit = TOTAL_power_produced - real_consumption
 
         hours_year = 366 * 24  # 2020 has 366 days
-        necessary_power = elec_cap_MW*cf*1000 * hours_year  # kwh here we add the capacity factor
+        necessary_power = elec_cap_MW * cf * 1000 * hours_year  # kwh here we add the capacity factor
         pv_credit = necessary_power - TOTAL_power_produced / 1000
-        grid=necessary_power - real_consumption / 1000
+        grid = necessary_power - real_consumption / 1000
 
         percentage_grid = grid / necessary_power
         percentage_pv = 1 - percentage_grid
@@ -353,7 +347,7 @@ def show():
         percentage_grid_real = min(max(percentage_grid, 0), 1)
         percentage_pv_real = min(max(percentage_pv, 0), 1)
 
-        with col2:
+        with col1:
             df['DateTime'] = pd.to_datetime(df['DateTime'], format='%Y%m%d:%H%M')
 
             # Extract date part and create a new column
@@ -367,7 +361,7 @@ def show():
             daily_sums.columns = ['Date', 'Total_elec_W_day']
             daily_sums_24.columns = ['Date', 'Total_elec_W_day_24']
 
-            max_value = 24*1000000*elec_cap_MW*cf  # Adjust this value to your desired cap
+            max_value = 24 * 1000000 * elec_cap_MW * cf  # Adjust this value to your desired cap
 
             daily_sums_24['Total_elec_W_day_24'] = daily_sums_24['Total_elec_W_day_24'].clip(upper=max_value)
             # total_sum_real_day = daily_sums_24['Total_elec_W_day_24'].sum()
@@ -387,65 +381,95 @@ def show():
             credit_minus_daily_extra = diff['Total_elec_W_day_Difference'].sum()
             pv_credit = necessary_power - TOTAL_power_produced / 1000
             grid = necessary_power - real_consumption / 1000
-            pv_credit_daily=necessary_power-total_sum_real_day/1000
-            extra_credit_from_total_credit=credit-credit_minus_daily_extra
+            pv_credit_daily = necessary_power - total_sum_real_day / 1000
+            extra_credit_from_total_credit = credit - credit_minus_daily_extra
 
-            row0_col1, row0_col2 = st.columns([3, 1])
-            row1_col1, row1_col2 = st.columns([3, 1])
-            row2_col1, row2_col2 = st.columns([3, 1])
-            row3_col1, row3_col2 = st.columns([3, 1])
+            col1.write("##### Electricity data:")
 
-            row0_col1.write(f"Electrolyzer's electricity consumption: ")
-            row0_col2.markdown(f":blue-background[{Ec_MWh / BoP_LT_y: .2f}MWh/year]", unsafe_allow_html=True)
+            row0_col1, row0_col2 = st.columns([3, 2])
+            row1_col1, row1_col2= st.columns([3, 2])
+            row2_col1, row2_col2= st.columns([3, 2])
+            row3_col1, row3_col2 = st.columns([3, 2])
+            row4_col1, row4_col2 = st.columns([3, 2])
 
-            row1_col1.write("PV electricity production:")
-            row1_col2.markdown(f" :blue-background[{TOTAL_power_produced/1000000:.2f} MWh/year]", unsafe_allow_html=True)
+            row0_col1.write(f"Electrolyzer's total consumption: ")
+            row0_col2.markdown(f"{Ec_MWh / BoP_LT_y: .2f}MWh/year", unsafe_allow_html=True)
 
-            if credit !=0:
-                row2_col1.write("PV extra electricity produced:")
-                row2_col2.markdown(f" :blue-background[{credit / 1000000:.2f} MWh/year]", unsafe_allow_html=True)
+            row1_col1.write("PV production:")
+            row1_col2.markdown(f" {TOTAL_power_produced / 1000000:.2f} MWh/year", unsafe_allow_html=True)
+
+            row2_col1.write("Electrolyzer's consumption from PV")
+            row2_col2.markdown(f" {real_consumption / 1000000:.2f} MWh/year", unsafe_allow_html=True)
+
+            if credit != 0:
+                row3_col1.write("PV surplus production:")
+                row3_col2.markdown(f" {credit / 1000000:.2f} MWh/year", unsafe_allow_html=True)
                 if credit_minus_daily_extra != 0:
-                    row3_col1.write("PV extra electricity produced (daily cap):")
-                    row3_col2.markdown(f":blue-background[{(credit-credit_minus_daily_extra)/1000000:.2f}MWh/year]", unsafe_allow_html=True)
+                    row4_col1.write("PV surplus production (daily cap):")
+                    row4_col2.markdown(f"{(credit - credit_minus_daily_extra) / 1000000:.2f}MWh/year",
+                                       unsafe_allow_html=True)
+            with col2:
+                st.write("##### Select an impact allocation option for electricity:")
 
-                col2.write("##### Select an impact allocation option for electricity:")
+                col1, col2, col3 = st.columns([3, 1, 2])
 
-                row4_col1, row4_col2, row4_col3 = st.columns([2, 2, 1])
-                row5_col1, row5_col2, row5_col3 = st.columns([2, 2, 1])
-                col2.write("")
-                row6_col1, row6_col2, row6_col3 = st.columns([2, 2, 1])
-                row7_col1, row7_col2, row7_col3 = st.columns([2, 2, 1])
-                col2.write("")
-                row8_col1, row8_col2, row8_col3 = st.columns([2, 2, 1])
-                row9_col1, row9_col2, row9_col3 = st.columns([2, 2, 1])
+                # Display radio buttons with conditional options
+                with col3:
+                    # Define the style for the radio button gap
+                    radio_style = """
+                                            <style>
+                                            .stRadio > div {
+                                                gap: 60px;
+                                            }
+                                            </style>
+                                            """
+                    st.markdown(radio_style, unsafe_allow_html=True)
 
-                row4_col2.write(":gray-background[Grid (real consumption):]")
-                row4_col3.write(f'<p class="right-align">{percentage_grid_real:.2%}</p>', unsafe_allow_html=True)
+                    # Default options
+                    radio_options = [":gray-background[Actual]", ":blue-background[PV credits]"]
 
-                row5_col2.write(":gray-background[PV (real consumption):]")
-                row5_col3.write(f'<p class="right-align">{percentage_pv_real:.2%}</p>', unsafe_allow_html=True)
+                    # Conditionally add the third option
+                    if credit_minus_daily_extra != 0:
+                        radio_options.append(":gray-background[PV credits (daily cap)]")
 
-                percentage_grid = pv_credit / necessary_power
-                percentage_pv = 1 - percentage_grid
+                    allocation = st.radio(
+                        "nothing",
+                        options=radio_options,
+                        key="allocation",
+                        label_visibility="collapsed"
+                    )
 
-                percentage_grid = min(max(percentage_grid, 0), 1)
-                percentage_pv = min(max(percentage_pv, 0), 1)
+                # Display text and calculated percentages
+                with col1:
+                    st.write("")
+                    st.write(":gray-background[Grid (actual consumption):]")
+                    st.write(":gray-background[PV (real consumption):]")
+                    st.write(":blue-background[Grid - PV credit:]")
+                    st.write(":blue-background[PV + PV credit:]")
+                    if credit_minus_daily_extra != 0:
+                        st.write(":gray-background[Grid - daily PV credit:]")
+                        st.write(":gray-background[PV + daily PV credit:]")
 
-                row6_col2.write(":blue-background[Grid - PV credit:]")
-                row6_col3.write(f'<p class="right-align">{percentage_grid:.2%}</p>', unsafe_allow_html=True)
+                with col2:
+                    st.write("")
+                    st.write(f'<p class="right-align">{percentage_grid_real:.2%}</p>', unsafe_allow_html=True)
+                    st.write(f'<p class="right-align">{percentage_pv_real:.2%}</p>', unsafe_allow_html=True)
 
-                row7_col2.write(":blue-background[PV + PV credit:]")
-                row7_col3.write(f'<p class="right-align">{percentage_pv:.2%}</p>', unsafe_allow_html=True)
+                    percentage_grid = pv_credit / necessary_power
+                    percentage_pv = 1 - percentage_grid
 
-                percentage_grid = pv_credit_daily / necessary_power
-                percentage_pv = 1 - percentage_grid
+                    percentage_grid = min(max(percentage_grid, 0), 1)
+                    percentage_pv = min(max(percentage_pv, 0), 1)
 
-                if credit_minus_daily_extra != 0:
-                    row8_col2.write(":gray-background[Grid - daily PV credit:]")
-                    row8_col3.write(f'<p class="right-align">{percentage_grid:.2%}</p>', unsafe_allow_html=True)
+                    st.write(f'<p class="right-align">{percentage_grid:.2%}</p>', unsafe_allow_html=True)
+                    st.write(f'<p class="right-align">{percentage_pv:.2%}</p>', unsafe_allow_html=True)
 
-                    row9_col2.write(":gray-background[PV + daily PV credit:]")
-                    row9_col3.write(f'<p class="right-align">{percentage_pv:.2%}</p>', unsafe_allow_html=True)
+                    percentage_grid = pv_credit_daily / necessary_power
+                    percentage_pv = 1 - percentage_grid
+
+                    if credit_minus_daily_extra != 0:
+                        st.write(f'<p class="right-align">{percentage_grid:.2%}</p>', unsafe_allow_html=True)
+                        st.write(f'<p class="right-align">{percentage_pv:.2%}</p>', unsafe_allow_html=True)
 
     #Indication for background before the data
     colored_header(
@@ -726,9 +750,6 @@ def show():
     bop_activity = agb.findActivity(name=activity_names[stack_type]['BoP'], db_name='AEC/PEM')
     t_Stack_activity = negAct(agb.findActivity(name=activity_names[stack_type]['Treatment_Stack'], db_name='AEC/PEM'))
     t_BoP_activity = negAct(agb.findActivity(name=activity_names[stack_type]['Treatment_BoP'], db_name='AEC/PEM'))
-
-    # Higher heating value
-    HHV = 39.4  # kWh/kg
 
     H2_produced = BoP_LT_h * cf * elec_cap * eff / HHV
     H2p = int(H2_produced)
