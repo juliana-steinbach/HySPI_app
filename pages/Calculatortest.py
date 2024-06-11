@@ -36,21 +36,20 @@ def show():
     BoP_LT_y = col1.number_input("Balance of Plant lifetime (years):", value=20, min_value=1, step=1)
     eff = col2.number_input("Stack efficiency (0 to 1):", value=0.72, min_value=0.0, max_value=1.0, step=0.01)
     cf = col3.number_input("Capacity factor (0 to 1):", value=0.9, min_value=0.01, max_value=1.00, step=0.05)
-    transp = col3.selectbox("Transport method", ["Pipeline", "Truck"], index=0)
+    transp = col3.selectbox("Transport method", ["Pipeline", "Truck"], index=1)
     renewable_coupling = col1.selectbox("Photovoltaic coupled?", ["Yes", "No"], index=1)
     storage_choice = col2.selectbox("Storage", ["Tank", "No storage"], index=1)
 
-    elec_cap_kW = elec_cap_MW*1_000
-    elec_cap_W = elec_cap_kW*1_000
+    elec_cap = elec_cap_MW*1000
     BoP_LT_h = BoP_LT_y * 365 * 24
-    Electricity_consumed_kWh = BoP_LT_h * cf * elec_cap_kW
-    Ec_kWh = int(Electricity_consumed_kWh)
-    Ec_MWh = Ec_kWh / 1_000 # Convert kWh to MWh
-    Ec_GWh = Ec_kWh / 1_000_000  # Convert kWh to GWh
+    Electricity_consumed = BoP_LT_h * cf * elec_cap
+    Ec = int(Electricity_consumed)
+    Ec_MWh = Ec / 1000 # Convert kWh to MWh
+    Ec_GWh = Ec / 1000000  # Convert kWh to GWh
     # Higher heating value
-    HHV_kWhkg = 39.4  # kWh/kg
+    HHV = 39.4  # kWh/kg
 
-    H2_year = 365 * 24 * cf * elec_cap_kW * eff / HHV_kWhkg #24h
+    H2_year = 365 * 24 * cf * elec_cap * eff / HHV
 
     # Help tooltips with data from IEA for stack and efficiency
     st.markdown("""
@@ -244,15 +243,7 @@ def show():
             query = f'{city_name}, France'
             results = geocoder.geocode(query)
             if results and len(results):
-                # Get the latitude and longitude values
-                lat = results[0]['geometry']['lat']
-                lng = results[0]['geometry']['lng']
-
-                # Round the latitude and longitude to 4 decimal places
-                rounded_lat = round(lat, 4)
-                rounded_lng = round(lng, 4)
-
-                return rounded_lat, rounded_lng
+                return results[0]['geometry']['lat'], results[0]['geometry']['lng']
             else:
                 return None
 
@@ -261,9 +252,10 @@ def show():
             col1.write("#### Enter a location or select one on the map")
 
             with col1:
-                city_name = st.text_input("Enter city name:", placeholder="Fos-sur-Mer")
+                city_name = st.text_input("Enter city name:")
                 st.write("or")
-                latlon = st.text_input("Enter latitude and longitude :",placeholder="e.g.: 43.4380, 4.9455", type="default")
+                latlon = st.text_input("Enter latitude and longitude (comma-separated):",
+                                       placeholder="e.g.: 43.4380714, 4.945595", type="default")
                 if latlon:
                     city_lat, city_lon = map(float, latlon.split(','))
 
@@ -275,52 +267,39 @@ def show():
                 data = get_city_coordinates(city_name)
                 if data:
                     folium.Marker(location=data).add_to(m)
-                    #m.location=data in case we want to use for the rest of europe
-                
+
             if latlon:  # Check if latitude and longitude are entered
                 data = (city_lat, city_lon)
                 folium.Marker(location=data).add_to(m)
-                m.fit_bounds([data])
-                m.set_zoom(5)
 
             with col2:
                 # When the user interacts with the map
                 map_data = st_folium(
                     m,
-                    width=330, height=340,
+                    width=330, height=350,
                     key="folium_map"
                 )
 
                 if map_data.get("last_clicked"):
-                    # Round the latitude and longitude to 4 decimal places
-                    lat = round(map_data["last_clicked"]["lat"], 4)
-                    lng = round(map_data["last_clicked"]["lng"], 4)
-
-                    # Get the position using the rounded values
-                    data = get_pos(lat, lng)
-
-                    # Add the marker to the map
+                    data = get_pos(map_data["last_clicked"]["lat"], map_data["last_clicked"]["lng"])
                     folium.Marker(location=data).add_to(m)
 
 
-            col1.markdown(f'<div style="padding: 5px; margin: 10px; border: 1px solid #cccccc; border-radius: 5px;"><b>Location selected:</b> {data}</div>', unsafe_allow_html=True)
+            col1.write(f"#### Location selected: {data}")
 
-
-        #st.markdown("---")
+        st.markdown("---")
 
     if data is not None:
-
-        col1, col3 = st.columns([1, 1])
-        pv_cap_MW = col1.number_input("Select the PV farm capacity (MW):", value=4.0*elec_cap_MW, min_value=0.1,
-                                      max_value=1_000_000.0, step=0.1)
-        pv_cap_kW=pv_cap_MW*1_000 #website requires pv capacity to be in kWp
+        col1, col2 = st.columns([1, 1])
+        pv_cap_MW = col1.number_input("Select the PV farm capacity (MW):", value=1.0, min_value=0.1,
+                                      max_value=1000000.0, step=0.1)
 
         #https: // re.jrc.ec.europa.eu / api / v5_2 / seriescalc?lat = 43.667 & lon = 5.596 & raddatabase = PVGIS - SARAH2 & browser = 1 & outputformat = csv & userhorizon = & usehorizon = 1 & angle = & aspect = & startyear = 2020 & endyear = 2020 & mountingplace = free & optimalinclination = 0 & optimalangles = 1 & js = 1 & select_database_hourly = PVGIS - SARAH2 & hstartyear = 2020 & hendyear = 2020 & trackingtype = 0 & hourlyoptimalangles = 1 & pvcalculation = 1 & pvtechchoice = crystSi & peakpower = 1300 & loss = 14 & components = 1
         #https://re.jrc.ec.europa.eu/pvg_tools/en/    hourly data
         #"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat=45.256&lon=2.734&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=0&aspect=1&startyear=2005&endyear=2005&mountingplace=free&optimalinclination=0&optimalangles=0&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2005&hendyear=2005&trackingtype=0&hourlyangle=0&hourlyaspect=1&pvcalculation=1&pvtechchoice=crystSi&peakpower=1&loss=14"
         #URL=f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat={data[0]}&lon={data[1]}&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={elec_cap_mw * 1.3}&loss=14"
-        URL = f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat={data[0]:.3f}&lon={data[1]:.3f}&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={pv_cap_kW* 1.3}&loss=14&components=1"
-        #URL = f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat=43.4928&lon=6.8555&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={elec_cap_kW* 1.3}&loss=14&components=1"
+        URL = f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat={data[0]:.3f}&lon={data[1]:.3f}&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={pv_cap_MW *1000* 1.3}&loss=14&components=1"
+        #URL = f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat=43.4928&lon=6.8555&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={pv_cap_MW*1000* 1.3}&loss=14&components=1"
 
         # Create a temporary file to save the CSV data
         o = NamedTemporaryFile(suffix=".csv", delete=False)
@@ -348,205 +327,202 @@ def show():
                         data2.append([columns[0], columns[1]])
 
         df = pd.DataFrame(data2, columns=header)
-        interval_h=1 #hourly
 
         # Convert 'elec_W' column to numeric, handling possible conversion issues
         df['elec_W'] = pd.to_numeric(df['elec_W'], errors='coerce')
-        df['elec_Wh'] = df['elec_W'] * interval_h
-        df['DateTime'] = pd.to_datetime(df['DateTime'], format='%Y%m%d:%H%M')
-
-        # Filter out 29th February as 2020 has 366 days
-        df = df[~((df['DateTime'].dt.month == 2) & (df['DateTime'].dt.day == 29))]
 
         # Sum of all elec_W figures
-        TOTAL_power_produced_Wh = df['elec_Wh'].sum()
-        capped_values = df['elec_Wh'].clip(upper=elec_cap_W*interval_h)
-        real_consumption_Wh = capped_values.sum()
-        credit = TOTAL_power_produced_Wh - real_consumption_Wh
+        TOTAL_power_produced = df['elec_W'].sum()
+        capped_values = df['elec_W'].clip(upper=elec_cap_MW * 1000000)
+        real_consumption = capped_values.sum()
+        credit = TOTAL_power_produced - real_consumption
 
-        hours_year = 365 * 24
-        necessary_power_Wh = elec_cap_W * cf * hours_year  # here we add the capacity factor because this is related to electrolyzer's consumption
-        pv_credit_Wh = necessary_power_Wh - TOTAL_power_produced_Wh
-        grid = necessary_power_Wh - real_consumption_Wh
+        hours_year = 366 * 24  # 2020 has 366 days
+        necessary_power = elec_cap_MW * cf * 1000 * hours_year  # kwh here we add the capacity factor
+        pv_credit = necessary_power - TOTAL_power_produced / 1000
+        grid = necessary_power - real_consumption / 1000
 
-        percentage_grid = grid / necessary_power_Wh
+        percentage_grid = grid / necessary_power
         percentage_pv = 1 - percentage_grid
 
         percentage_grid_real = min(max(percentage_grid, 0), 1)
         percentage_pv_real = min(max(percentage_pv, 0), 1)
 
         with col1:
+            df['DateTime'] = pd.to_datetime(df['DateTime'], format='%Y%m%d:%H%M')
 
-            battery_coupling = col1.selectbox("Battery coupled?", ["Yes", "No"], index=1)
-            if battery_coupling == "Yes":
-
-                # Battery system
-                battery_power_capacity_MW = col1.number_input("Battery power capacity (MW):", value=1.0, min_value=0.0, step=0.1)
-                battery_power_capacity_W = battery_power_capacity_MW * 1_000_000  # Convert to watts
-
-                # Define storage capacity in Wh (20 MWh)
-                battery_storage_capacity_MWh = col1.number_input("Battery storage capacity (MWh):", value=1.0, min_value=0.0, step=0.1)
-                battery_storage_capacity_Wh = battery_storage_capacity_MWh * 1_000_000  # Convert to watt-hours
-
-                # Define efficiencies
-                eff_charge = 0.9
-                eff_discharge = 0.9
-
-                # Calculate the surplus electricity
-                df['surplus_W'] = df['elec_W'] - elec_cap_W
-                df['surplus_W'] = df['surplus_W'].clip(lower=0)  # Clip negative values to 0
-
-                # Initialize battery state
-                battery_initial_capacity_Wh = 0  # Initial battery energy capacity in watt-hours
-                battery_charge = []
-                excess_to_grid = []
-                total_stored_energy_Wh = 0
-                total_discharged_energy_W = 0
-
-                for i, row in df.iterrows():
-                    surplus = row['surplus_W']
-                    if surplus > 0:
-                        # Calculate the potential charge in Wh
-                        charge = surplus * eff_charge * interval_h  # Convert from W to Wh
-                        if battery_initial_capacity_Wh + charge > battery_storage_capacity_Wh:
-                            # Calculate the excess that must be sent to the grid in W
-                            excess = (
-                                                 battery_initial_capacity_Wh + charge - battery_storage_capacity_Wh) / interval_h  # Convert from Wh to W
-                            charge = battery_storage_capacity_Wh - battery_initial_capacity_Wh  # Adjust charge to fill the battery
-                            battery_initial_capacity_Wh = battery_storage_capacity_Wh  # Battery is fully charged
-                            excess_to_grid.append(excess)
-                        else:
-                            # Charge the battery with surplus electricity, considering charging efficiency
-                            battery_initial_capacity_Wh += charge
-                            excess_to_grid.append(0)
-
-                        # Track total stored energy
-                        total_stored_energy_Wh += charge
-                    else:
-                        # Calculate deficit (in case elec_W is less than electrolyzer capacity)
-                        deficit = max(0, elec_cap_W - row['elec_W'])
-                        # Discharge from battery if there is enough capacity, considering discharging efficiency
-                        discharge = min(deficit / eff_discharge,
-                                        battery_initial_capacity_Wh / interval_h)  # Convert from Wh to W
-                        battery_initial_capacity_Wh -= discharge * interval_h  # Convert from W to Wh
-                        excess_to_grid.append(0)
-
-                        # Track total discharged energy
-                        total_discharged_energy_W += discharge * eff_discharge * interval_h  # Convert from W to Wh
-
-                    # Record battery capacity after each interval
-                    battery_charge.append(battery_initial_capacity_Wh)
-
-                df['battery_capacity_Wh'] = battery_charge
-                df['excess_to_grid_W'] = excess_to_grid
-
-                # Calculate the total electricity used by the electrolyzer
-                total_electrolyzer_use_W = df['elec_W'].clip(
-                    upper=elec_cap_W).sum() + total_discharged_energy_W / interval_h  # Convert from Wh to W
-
-                # Sum the excess electricity sent to the grid
-                total_excess_to_grid_W = sum(excess_to_grid)
-                total_excess_to_grid_MWh = total_excess_to_grid_W * interval_h / 1_000_000  # Convert from W to MWh
-
-                #col1.write(f"Total Excess Electricity Sent to Grid: {total_excess_to_grid_MWh:.2f} MWh")
-                #col1.write(f"Total electricity stored in the battery: {total_stored_energy_Wh / 1_000_000:.2f} MWh")
-                #col1.write(f"Total electricity discharged from the battery: {total_discharged_energy_W / 1_000_000:.2f} MWh")
-                #col1.write(f"Total electricity used by the electrolyzer: {total_electrolyzer_use_W / 1_000_000:.2f} MWh")
-
-            # daily cap begins here:
             # Extract date part and create a new column
             df['Date'] = df['DateTime'].dt.date
 
+            #battery system
+            elec_cap_MW = 0.5  # Example value
+            elec_cap_W = elec_cap_MW * 1000000  # Convert to watts
+
+            # Battery specifications
+            battery_max_power_MW = 5  # Example battery power capacity in MW
+            battery_max_power_W = battery_max_power_MW * 1000000  # Convert to watts
+
+            # Define efficiencies
+            eta_charge = 0.9
+            eta_discharge = 0.9
+
+            # Calculate the surplus electricity
+            df['surplus_W'] = df['elec_W'] - elec_cap_W
+            df['surplus_W'] = df['surplus_W'].clip(lower=0)  # Clip negative values to 0
+
+            # Initialize variables
+            battery_capacity = 0  # Initial battery capacity in watt-hours
+            battery_charge = []
+            grid_export = []
+
+            # Simulate battery charging and grid export
+            for i, row in df.iterrows():
+                surplus = row['surplus_W']
+                if surplus > 0:
+                    # Determine the effective charging power considering battery power limit and charging efficiency
+                    charge_power = min(surplus * eta_charge, battery_max_power_W)
+                    battery_capacity += charge_power * (10 / 60)  # Convert 10-minute interval to hours
+
+                    # Calculate the surplus that exceeds the battery's charging capability
+                    excess_power = max(0, surplus - (battery_max_power_W / eta_charge))
+                else:
+                    # Calculate deficit (in case elec_W is less than electrolyzer capacity)
+                    deficit = max(0, elec_cap_W - row['elec_W'])
+                    discharge = min(deficit / eta_discharge, battery_capacity)
+                    battery_capacity -= discharge * (10 / 60)  # Convert 10-minute interval to hours
+                    excess_power = 0  # No surplus when there's a deficit
+
+                # Record the battery capacity and grid export
+                battery_charge.append(battery_capacity)
+                grid_export.append(excess_power)
+
+            df['battery_capacity_Wh'] = battery_charge
+            df['grid_export_W'] = grid_export
+
+            # Summarize results
+            total_grid_export_Wh = sum(df['grid_export_W']) * (10 / 60)  # Convert to watt-hours
+            total_grid_export_MWh = total_grid_export_Wh / 1000000  # Convert to megawatt-hours
+
+            #daily cap begins here:
             # Group by the date and sum the 'elec_W' values
-            daily_sums = df.groupby('Date')['elec_Wh'].sum().reset_index()
-            daily_sums_24 = df.groupby('Date')['elec_Wh'].sum().reset_index()
+            daily_sums = df.groupby('Date')['elec_W'].sum().reset_index()
+            daily_sums_24 = df.groupby('Date')['elec_W'].sum().reset_index()
 
             # Rename columns for clarity
-            daily_sums.columns = ['Date', 'Total_elec_Wh_day']
-            daily_sums_24.columns = ['Date', 'Total_elec_Wh_day_24']
+            daily_sums.columns = ['Date', 'Total_elec_W_day']
+            daily_sums_24.columns = ['Date', 'Total_elec_W_day_24']
 
             # Daily cap
-            max_value = 24 * elec_cap_W * cf
+            max_value = 24 * 1000000 * elec_cap_MW * cf
 
-            daily_sums_24['Total_elec_Wh_day_24'] = daily_sums_24['Total_elec_Wh_day_24'].clip(upper=max_value)
+            daily_sums_24['Total_elec_W_day_24'] = daily_sums_24['Total_elec_W_day_24'].clip(upper=max_value)
             # total_sum_real_day = daily_sums_24['Total_elec_W_day_24'].sum()
             merged_df = pd.merge(daily_sums, daily_sums_24, on='Date')
 
             # Calculate the difference
-            merged_df['Difference'] = merged_df['Total_elec_Wh_day'] - merged_df['Total_elec_Wh_day_24']
+            merged_df['Difference'] = merged_df['Total_elec_W_day'] - merged_df['Total_elec_W_day_24']
 
             # Create the new DataFrame with 'Date' and 'Difference'
             diff = merged_df[['Date', 'Difference']]
 
             # Rename the columns if needed
-            diff.columns = ['Date', 'Total_elec_Wh_day_Difference']
+            diff.columns = ['Date', 'Total_elec_W_day_Difference']
 
-            total_sum_real_year_Wh = daily_sums['Total_elec_Wh_day'].sum()  # =TOTAL_power_produced_Wh = df['elec_W'h].sum()
-            total_sum_real_day_Wh = daily_sums_24['Total_elec_Wh_day_24'].sum()
-            credit_minus_daily_extra_Wh = diff['Total_elec_Wh_day_Difference'].sum()
-            pv_credit_Wh = necessary_power_Wh - TOTAL_power_produced_Wh
-            grid_Wh = necessary_power_Wh - real_consumption_Wh
-            pv_credit_daily_Wh = necessary_power_Wh - total_sum_real_day_Wh
-            extra_credit_from_total_credit_Wh = credit - credit_minus_daily_extra_Wh
+            total_sum_real_year = daily_sums['Total_elec_W_day'].sum()  # =TOTAL_power_produced = df['elec_W'].sum()
+            total_sum_real_day = daily_sums_24['Total_elec_W_day_24'].sum()
+            credit_minus_daily_extra = diff['Total_elec_W_day_Difference'].sum()
+            pv_credit = necessary_power - TOTAL_power_produced / 1000
+            grid = necessary_power - real_consumption / 1000
+            pv_credit_daily = necessary_power - total_sum_real_day / 1000
+            extra_credit_from_total_credit = credit - credit_minus_daily_extra
 
             col1.write("##### Electricity data (year):")
+            col1.write(f"Total Grid Export: {total_grid_export_MWh} MWh")
 
-            col1, col2 = st.columns([4, 2])
+            row0_col1, row0_col2 = st.columns([3, 2])
+            row1_col1, row1_col2= st.columns([3, 2])
+            row2_col1, row2_col2= st.columns([3, 2])
+            row3_col1, row3_col2 = st.columns([3, 2])
+            row4_col1, row4_col2 = st.columns([3, 2])
 
-            col1.write(f"Electrolyzer's total consumption: ")
-            col2.write(f"{Ec_MWh / BoP_LT_y:.2f}MWh")
-            col1.write("PV production:")
-            col2.markdown(f" {TOTAL_power_produced_Wh / 1000000:.2f} MWh", unsafe_allow_html=True)
-            col1.write("Electrolyzer's consumption from PV")
-            col2.markdown(f" {real_consumption_Wh / 1000000:.2f} MWh", unsafe_allow_html=True)
+            row0_col1.write(f"Electrolyzer's total consumption: ")
+            row0_col2.markdown(f"{Ec_MWh / BoP_LT_y: .2f}MWh", unsafe_allow_html=True)
+
+            row1_col1.write("PV production:")
+            row1_col2.markdown(f" {TOTAL_power_produced / 1000000:.2f} MWh", unsafe_allow_html=True)
+
+            row2_col1.write("Electrolyzer's consumption from PV")
+            row2_col2.markdown(f" {real_consumption / 1000000:.2f} MWh", unsafe_allow_html=True)
 
             if credit != 0:
-                col1.write("PV surplus production:")
-                col2.markdown(f" {credit / 1000000:.2f} MWh", unsafe_allow_html=True)
-                if credit_minus_daily_extra_Wh != 0:
-                    col1.write("PV surplus production (daily cap):")
-                    col2.markdown(f"{(credit - credit_minus_daily_extra_Wh) / 1000000:.2f}MWh",
+                row3_col1.write("PV surplus production:")
+                row3_col2.markdown(f" {credit / 1000000:.2f} MWh", unsafe_allow_html=True)
+                if credit_minus_daily_extra != 0:
+                    row4_col1.write("PV surplus production (daily cap):")
+                    row4_col2.markdown(f"{(credit - credit_minus_daily_extra) / 1000000:.2f}MWh",
                                        unsafe_allow_html=True)
+            with col2:
+                st.write("##### Select an impact allocation option for electricity:")
 
-        with col3:
-            st.write("##### Select an impact allocation option for electricity:")
+                col1, col2, col3 = st.columns([3, 1, 2])
 
-            col1, col2 = st.columns([3, 1])
+                # Display radio buttons with conditional options
+                with col3:
+                    # Define the style for the radio button gap
+                    radio_style = """
+                                            <style>
+                                            .stRadio > div {
+                                                gap: 60px;
+                                            }
+                                            </style>
+                                            """
+                    st.markdown(radio_style, unsafe_allow_html=True)
 
-            # Display text and calculated percentages
-            with col1:
-                st.write("")
+                    # Default options
+                    radio_options = [":gray-background[Actual]", ":blue-background[PV credits]"]
 
-                st.write(":gray-background[Grid (actual consumption):]")
-                st.write(":gray-background[PV (real consumption):]")
-                if TOTAL_power_produced_Wh != real_consumption_Wh:
+                    # Conditionally add the third option
+                    if credit_minus_daily_extra != 0:
+                        radio_options.append(":gray-background[PV credits (daily cap)]")
+
+                    allocation = st.radio(
+                        "nothing",
+                        options=radio_options,
+                        key="allocation",
+                        label_visibility="collapsed"
+                    )
+
+                # Display text and calculated percentages
+                with col1:
+                    st.write("")
+                    st.write(":gray-background[Grid (actual consumption):]")
+                    st.write(":gray-background[PV (real consumption):]")
                     st.write(":blue-background[Grid - PV credit:]")
                     st.write(":blue-background[PV + PV credit:]")
-                    if credit_minus_daily_extra_Wh != 0:
+                    if credit_minus_daily_extra != 0:
                         st.write(":gray-background[Grid - daily PV credit:]")
                         st.write(":gray-background[PV + daily PV credit:]")
 
-            with col2:
-                st.write("")
-                st.write(f'{percentage_grid_real:.2%}', unsafe_allow_html=True)
-                st.write(f'{percentage_pv_real:.2%}', unsafe_allow_html=True)
+                with col2:
+                    st.write("")
+                    st.write(f'<p class="right-align">{percentage_grid_real:.2%}</p>', unsafe_allow_html=True)
+                    st.write(f'<p class="right-align">{percentage_pv_real:.2%}</p>', unsafe_allow_html=True)
 
-                percentage_grid = pv_credit_Wh / necessary_power_Wh
-                percentage_pv = 1 - percentage_grid
-
-                percentage_grid = min(max(percentage_grid, 0), 1)
-                percentage_pv = min(max(percentage_pv, 0), 1)
-
-                if TOTAL_power_produced_Wh != real_consumption_Wh:
-                    st.write(f'{percentage_grid:.2%}', unsafe_allow_html=True)
-                    st.write(f'{percentage_pv:.2%}', unsafe_allow_html=True)
-
-                    percentage_grid = pv_credit_daily_Wh / necessary_power_Wh
+                    percentage_grid = pv_credit / necessary_power
                     percentage_pv = 1 - percentage_grid
 
-                    if credit_minus_daily_extra_Wh != 0:
-                        st.write(f'{percentage_grid:.2%}', unsafe_allow_html=True)
-                        st.write(f'{percentage_pv:.2%}', unsafe_allow_html=True)
+                    percentage_grid = min(max(percentage_grid, 0), 1)
+                    percentage_pv = min(max(percentage_pv, 0), 1)
+
+                    st.write(f'<p class="right-align">{percentage_grid:.2%}</p>', unsafe_allow_html=True)
+                    st.write(f'<p class="right-align">{percentage_pv:.2%}</p>', unsafe_allow_html=True)
+
+                    percentage_grid = pv_credit_daily / necessary_power
+                    percentage_pv = 1 - percentage_grid
+
+                    if credit_minus_daily_extra != 0:
+                        st.write(f'<p class="right-align">{percentage_grid:.2%}</p>', unsafe_allow_html=True)
+                        st.write(f'<p class="right-align">{percentage_pv:.2%}</p>', unsafe_allow_html=True)
 
     #Indication for background before the data
     colored_header(
@@ -830,13 +806,13 @@ def show():
     t_Stack_activity = negAct(agb.findActivity(name=activity_names[stack_type]['Treatment_Stack'], db_name='AEC/PEM'))
     t_BoP_activity = negAct(agb.findActivity(name=activity_names[stack_type]['Treatment_BoP'], db_name='AEC/PEM'))
 
-    H2_produced = BoP_LT_h * cf * elec_cap_kW * eff / HHV_kWhkg
+    H2_produced = BoP_LT_h * cf * elec_cap * eff / HHV
     H2p = int(H2_produced)
     H2p_ton = H2p / 1000  # Convert kg to tons
     H2_per_hour = H2p / (BoP_LT_h * cf)
-    Electricity_1kg = Electricity_consumed_kWh / H2_produced  # = HHV/eff
+    Electricity_1kg = Electricity_consumed / H2_produced  # = HHV/eff
 
-    E1 = round(Electricity_consumed_kWh / H2_produced, 2)
+    E1 = round(Electricity_consumed / H2_produced, 2)
 
     n_stacks = BoP_LT_h / stack_LT
 
@@ -921,7 +897,7 @@ def show():
                                exchanges={
                                    stack_activity: n_stacks / H2_produced,
                                    bop_activity: 1 / H2_produced,
-                                   Occupation_ind: land_factor / elec_cap_kW / H2_produced / BoP_LT_y,
+                                   Occupation_ind: land_factor / elec_cap / H2_produced / BoP_LT_y,
                                    Transformation_from_ind: land_factor / H2_produced,
                                    Transformation_to_ind: land_factor / H2_produced,
                                    eol: 1,

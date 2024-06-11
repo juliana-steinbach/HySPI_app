@@ -4,9 +4,14 @@ from urllib.request import urlopen
 from tempfile import NamedTemporaryFile
 from urllib.request import urlopen
 from tempfile import NamedTemporaryFile
-pv_cap_MW=3
-elec_cap_MW=1
-URL = f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat=43.4928&lon=6.8555&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={pv_cap_MW * 1000 * 1.3}&loss=14&components=1"
+
+pv_cap_MW=100
+pv_cap_kW=pv_cap_MW*1000
+pv_cap_W=pv_cap_kW*1000
+
+elec_cap_MW=20
+elec_cap_W= elec_cap_MW*1000000
+URL = f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat=38.6860347&lon=-4.1121461&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={pv_cap_kW * 1.3}&loss=14&components=1"
 
 # Create a temporary file to save the CSV data
 o = NamedTemporaryFile(suffix=".csv", delete=False)
@@ -35,22 +40,24 @@ with open(o.name, 'r') as file:
 
 # Create a DataFrame from the data and name the columns
 df = pd.DataFrame(data2, columns=header)
+interval_h=10/60
 
 # Convert 'elec_W' column to numeric, handling possible conversion issues
 df['elec_W'] = pd.to_numeric(df['elec_W'], errors='coerce')
+df['elec_Wh'] = df['elec_W'] * interval_h
 
 # Sum of all elec_W figures
-TOTAL_power_produced = df['elec_W'].sum()
-capped_values = df['elec_W'].clip(upper=elec_cap_MW * 1000000)
-real_consumption = capped_values.sum()
-credit = TOTAL_power_produced - real_consumption
+TOTAL_power_produced_Wh = df['elec_Wh'].sum()
+capped_values = df['elec_Wh'].clip(upper=elec_cap_W*interval_h)
+real_consumption_Wh = capped_values.sum()
+credit = TOTAL_power_produced_Wh - real_consumption_Wh
 
-hours_year = 366 * 24  # 2020 has 366 days
-necessary_power = elec_cap_MW * 1000 * hours_year  # kwh
-pv_credit = necessary_power - TOTAL_power_produced / 1000
-grid = necessary_power - real_consumption / 1000
+hours_year = 366 * 24
+necessary_power_Wh = elec_cap_W * hours_year  #*cf kwh here we add the capacity factor
+pv_credit_Wh = necessary_power_Wh - TOTAL_power_produced_Wh
+grid = necessary_power_Wh - real_consumption_Wh
 
-percentage_grid = grid / necessary_power
+percentage_grid = grid / necessary_power_Wh
 percentage_pv = 1 - percentage_grid
 
 percentage_grid_real = min(max(percentage_grid, 0), 1)
@@ -86,44 +93,43 @@ df['DateTime'] = pd.to_datetime(df['DateTime'], format='%Y%m%d:%H%M')
 df['Date'] = df['DateTime'].dt.date
 
 # Group by the date and sum the 'elec_W' values
-daily_sums = df.groupby('Date')['elec_W'].sum().reset_index()
-daily_sums_24 = df.groupby('Date')['elec_W'].sum().reset_index()
+daily_sums = df.groupby('Date')['elec_Wh'].sum().reset_index()
+daily_sums_24 = df.groupby('Date')['elec_Wh'].sum().reset_index()
 
 # Rename columns for clarity
-daily_sums.columns = ['Date', 'Total_elec_W_day']
-daily_sums_24.columns = ['Date', 'Total_elec_W_day_24']
+daily_sums.columns = ['Date', 'Total_elec_Wh_day']
+daily_sums_24.columns = ['Date', 'Total_elec_Wh_day_24']
 
-max_value = 24000000  # Adjust this value to your desired cap
+max_value = 24 * elec_cap_W  #*cf
 
-daily_sums_24['Total_elec_W_day_24'] = daily_sums_24['Total_elec_W_day_24'].clip(upper=max_value)
-# total_sum_real_day = daily_sums_24['Total_elec_W_day_24'].sum()
+#daily_sums_24['Total_elec_Wh_day_24'] = daily_sums_24['Total_elec_Wh_day_24'].clip(upper=max_value)
+# total_sum_real_day = daily_sums_24['Total_elec_Wh_day_24'].sum()
 merged_df = pd.merge(daily_sums, daily_sums_24, on='Date')
 
 # Calculate the difference
-merged_df['Difference'] = merged_df['Total_elec_W_day'] - merged_df['Total_elec_W_day_24']
+merged_df['Difference'] = merged_df['Total_elec_Wh_day'] - merged_df['Total_elec_Wh_day_24']
 
 # Create the new DataFrame with 'Date' and 'Difference'
 diff = merged_df[['Date', 'Difference']]
 
 # Rename the columns if needed
-diff.columns = ['Date', 'Total_elec_W_day_Difference']
+diff.columns = ['Date', 'Total_elec_Wh_day_Difference']
 
-total_sum_real_year = daily_sums['Total_elec_W_day'].sum()  # =TOTAL_power_produced = df['elec_W'].sum()
-total_sum_real_day = daily_sums_24['Total_elec_W_day_24'].sum()
-credit_minus_daily_extra = diff['Total_elec_W_day_Difference'].sum()
-pv_credit = necessary_power - TOTAL_power_produced / 1000
-grid = necessary_power - real_consumption / 1000
-pv_credit_daily = necessary_power - total_sum_real_day / 1000
-extra_credit_from_total_credit = credit - credit_minus_daily_extra
+total_sum_real_year_Wh = daily_sums['Total_elec_Wh_day'].sum()  # =TOTAL_power_produced = df['elec_W'].sum()
+total_sum_real_day_Wh = daily_sums_24['Total_elec_Wh_day_24'].sum()
+credit_minus_daily_extra_Wh = diff['Total_elec_Wh_day_Difference'].sum()
+pv_credit_daily = necessary_power_Wh - total_sum_real_day_Wh / 1000
+extra_credit_from_total_credit = credit - credit_minus_daily_extra_Wh
 
 
 print(daily_sums)
 print(daily_sums_24)
 print(diff)
-print(total_sum_real_year)
-print(total_sum_real_day)
-print(TOTAL_power_produced)
-print(real_consumption)
-print(f"credit: {pv_credit}")
-print(f"not credit: {credit_minus_daily_extra}")
+print(total_sum_real_year_Wh)
+print(total_sum_real_day_Wh)
+print(f"TOTAL_power_produced_Wh: {TOTAL_power_produced_Wh/1000000}")
+print(real_consumption_Wh)
+print(f"credit: {pv_credit_Wh}")
+print(f"not credit: {credit_minus_daily_extra_Wh}")
+print(f"pv_cap_kW: {pv_cap_kW}")
 
