@@ -412,10 +412,11 @@ def show():
                 gifb_path = 'H2b.gif'
                 col3.image(gifb_path, use_column_width=True)
 
-                col1, col2, col3 = st.columns([1, 1, 1])
+                col1, col2, col3 = st.columns([2, 1, 2])
 
                 col1.write("##### Electricity per year:")
                 col2.write("##### [KWh]")
+                col3.write("##### Allocation options")
 
                 col1.write(f"Electrolyzer's total consumption: ")
                 col2.write(f"{Ec_MWh / BoP_LT_y:.2f}MWh")
@@ -434,41 +435,42 @@ def show():
 
                 st.write("##### Select an impact allocation option for electricity:")
 
-                col1, col2 = st.columns([3, 1])
+                with col3:
+                    col1, col2 = st.columns([3, 1])
 
-                # Display text and calculated percentages
-                with col1:
-                    st.write("")
-                    st.write(":gray-background[Grid (real consumption):]")
-                    st.write(":gray-background[PV (real consumption):]")
-                    if TOTAL_elec_produced_Wh != real_consumption_Wh:
-                        st.write(":blue-background[Grid - PV credit:]")
-                        st.write(":blue-background[PV + PV credit:]")
-                        if credit_minus_daily_extra_Wh != 0:
-                            st.write(":gray-background[Grid - daily PV credit:]")
-                            st.write(":gray-background[PV + daily PV credit:]")
+                    # Display text and calculated percentages
+                    with col1:
+                        st.write("")
+                        st.write(":gray-background[Grid (real consumption):]")
+                        st.write(":gray-background[PV (real consumption):]")
+                        if TOTAL_elec_produced_Wh != real_consumption_Wh:
+                            st.write(":blue-background[Grid - PV credit:]")
+                            st.write(":blue-background[PV + PV credit:]")
+                            if credit_minus_daily_extra_Wh != 0:
+                                st.write(":gray-background[Grid - daily PV credit:]")
+                                st.write(":gray-background[PV + daily PV credit:]")
 
-                with col2:
-                    st.write("")
-                    st.write(f'{percentage_grid_real:.2%}', unsafe_allow_html=True)
-                    st.write(f'{percentage_pv_real:.2%}', unsafe_allow_html=True)
+                    with col2:
+                        st.write("")
+                        st.write(f'{percentage_grid_real:.2%}', unsafe_allow_html=True)
+                        st.write(f'{percentage_pv_real:.2%}', unsafe_allow_html=True)
 
-                    percentage_grid = pv_credit_Wh / necessary_elec_Wh
-                    percentage_pv = 1 - percentage_grid
-
-                    percentage_grid = min(max(percentage_grid, 0), 1)
-                    percentage_pv = min(max(percentage_pv, 0), 1)
-
-                    if TOTAL_elec_produced_Wh != real_consumption_Wh:
-                        st.write(f'{percentage_grid:.2%}', unsafe_allow_html=True)
-                        st.write(f'{percentage_pv:.2%}', unsafe_allow_html=True)
-
-                        percentage_grid = pv_credit_daily_Wh / necessary_elec_Wh
+                        percentage_grid = pv_credit_Wh / necessary_elec_Wh
                         percentage_pv = 1 - percentage_grid
 
-                        if credit_minus_daily_extra_Wh != 0:
+                        percentage_grid = min(max(percentage_grid, 0), 1)
+                        percentage_pv = min(max(percentage_pv, 0), 1)
+
+                        if TOTAL_elec_produced_Wh != real_consumption_Wh:
                             st.write(f'{percentage_grid:.2%}', unsafe_allow_html=True)
                             st.write(f'{percentage_pv:.2%}', unsafe_allow_html=True)
+
+                            percentage_grid = pv_credit_daily_Wh / necessary_elec_Wh
+                            percentage_pv = 1 - percentage_grid
+
+                            if credit_minus_daily_extra_Wh != 0:
+                                st.write(f'{percentage_grid:.2%}', unsafe_allow_html=True)
+                                st.write(f'{percentage_pv:.2%}', unsafe_allow_html=True)
 
             if battery_coupling == "Yes":
                 gif_path = 'H2.gif'
@@ -522,10 +524,11 @@ def show():
                 # Calculate efficiency losses
                 efficiency_losses_Wh = total_elec_sent_to_battery_Wh - total_elec_consumed_from_battery_Wh
 
-                col1, col2, col3 = st.columns([2, 1, 1])
+                col1, col2, col3 = st.columns([2, 1, 2])
 
                 col1.write("##### Electricity per year:")
                 col2.write("##### [MWh]")
+                col3.write("##### Allocation options")
 
                 col1.write(f"Electrolyzer's total consumption: ")
                 col2.write(f"{Ec_MWh / BoP_LT_y:.2f}")
@@ -574,41 +577,43 @@ def show():
                 pv_credit_Wh = necessary_elec_Wh - TOTAL_elec_produced_Wh
                 pv_credit_daily_Wh = necessary_elec_Wh - total_sum_real_day_Wh
 
-                col1, col2 = st.columns([3, 1])
+                with col3:
 
-                # Display text and calculated percentages
-                with col1:
-                    st.write("")
-                    st.write(":gray-background[Grid (real consumption):]")
-                    st.write(":gray-background[PV (real consumption):]")
-                    if TOTAL_elec_produced_Wh != real_consumption_Wh:
-                        st.write(":blue-background[Grid - PV credit:]")
-                        st.write(":blue-background[PV + PV credit:]")
-                        if credit_minus_daily_extra_Wh != 0:
-                            st.write(":gray-background[Grid - daily PV credit:]")
-                            st.write(":gray-background[PV + daily PV credit:]")
+                    col1, col2 = st.columns([3, 1])
 
-                with col2:
-                    st.write("")
-                    st.write(f'{percentage_grid_real:.2%}', unsafe_allow_html=True)
-                    st.write(f'{percentage_pv_real:.2%}', unsafe_allow_html=True)
+                    # Display text and calculated percentages
+                    with col1:
+                        st.write("")
+                        st.write(":gray-background[Grid (real consumption):]")
+                        st.write(":gray-background[PV (real consumption):]")
+                        if TOTAL_elec_produced_Wh != real_consumption_Wh:
+                            st.write(":blue-background[Grid - PV credit:]")
+                            st.write(":blue-background[PV + PV credit:]")
+                            if credit_minus_daily_extra_Wh != 0:
+                                st.write(":gray-background[Grid - daily PV credit:]")
+                                st.write(":gray-background[PV + daily PV credit:]")
 
-                    percentage_grid = pv_credit_Wh / necessary_elec_Wh
-                    percentage_pv = 1 - percentage_grid
+                    with col2:
+                        st.write("")
+                        st.write(f'{percentage_grid_real:.2%}', unsafe_allow_html=True)
+                        st.write(f'{percentage_pv_real:.2%}', unsafe_allow_html=True)
 
-                    percentage_grid = min(max(percentage_grid, 0), 1)
-                    percentage_pv = min(max(percentage_pv, 0), 1)
-
-                    if TOTAL_elec_produced_Wh != real_consumption_Wh:
-                        st.write(f'{percentage_grid:.2%}', unsafe_allow_html=True)
-                        st.write(f'{percentage_pv:.2%}', unsafe_allow_html=True)
-
-                        percentage_grid = pv_credit_daily_Wh / necessary_elec_Wh
+                        percentage_grid = pv_credit_Wh / necessary_elec_Wh
                         percentage_pv = 1 - percentage_grid
 
-                        if credit_minus_daily_extra_Wh != 0:
+                        percentage_grid = min(max(percentage_grid, 0), 1)
+                        percentage_pv = min(max(percentage_pv, 0), 1)
+
+                        if TOTAL_elec_produced_Wh != real_consumption_Wh:
                             st.write(f'{percentage_grid:.2%}', unsafe_allow_html=True)
                             st.write(f'{percentage_pv:.2%}', unsafe_allow_html=True)
+
+                            percentage_grid = pv_credit_daily_Wh / necessary_elec_Wh
+                            percentage_pv = 1 - percentage_grid
+
+                            if credit_minus_daily_extra_Wh != 0:
+                                st.write(f'{percentage_grid:.2%}', unsafe_allow_html=True)
+                                st.write(f'{percentage_pv:.2%}', unsafe_allow_html=True)
 
 
 
