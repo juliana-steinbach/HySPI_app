@@ -486,8 +486,8 @@ def show():
                                                                  min_value=0.0, step=0.1)
                 battery_storage_capacity_Wh = battery_storage_capacity_MWh * 1_000_000  # Convert to watt-hours
 
-                eff_charge = 0.9
-                eff_discharge = 0.9
+                eff_charge = 0.995
+                eff_discharge = 0.995
 
                 # Initialize battery state variables
                 battery_stored_Wh = 0
