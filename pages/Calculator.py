@@ -8,6 +8,7 @@ from tempfile import NamedTemporaryFile
 from streamlit_extras.colored_header import colored_header
 import time
 from opencage.geocoder import OpenCageGeocode
+import matplotlib.pyplot as plt
 
 
 def show():
@@ -35,7 +36,7 @@ def show():
     stack_LT = col3.number_input("Stack lifetime (h):", value=120000, min_value=1, step=1)
     BoP_LT_y = col1.number_input("Balance of Plant lifetime (years):", value=20, min_value=1, step=1)
     eff = col2.number_input("Stack efficiency (0 to 1):", value=0.72, min_value=0.0, max_value=1.0, step=0.01)
-    cf = col3.number_input("Capacity factor (0 to 1):", value=0.95, min_value=0.01, max_value=1.00, step=0.05)
+    cf = col3.number_input("Capacity factor (0 to 1):", value=1.0, min_value=0.01, max_value=1.00, step=0.05)
     transp = col3.selectbox("Transport method", ["Pipeline", "Truck"], index=0)
     renewable_coupling = col1.selectbox("Photovoltaic coupled?", ["Yes", "No"], index=1)
     storage_choice = col2.selectbox("Storage", ["Tank", "No storage"], index=1)
@@ -242,7 +243,7 @@ def show():
             return lat, lng
 
         def get_city_coordinates(city_name):
-            query = f'{city_name}, France'
+            query = f'{city_name}, France, Spain'
             results = geocoder.geocode(query)
             if results and len(results):
                 # Get the latitude and longitude values
@@ -321,6 +322,7 @@ def show():
             pv_cap_kW=pv_cap_MW*1_000 #website requires pv capacity to be in kWp
 
             URL = f"https://re.jrc.ec.europa.eu/api/v5_2/seriescalc?lat={data[0]:.3f}&lon={data[1]:.3f}&raddatabase=PVGIS-SARAH2&browser=1&outputformat=csv&userhorizon=&usehorizon=1&angle=&aspect=&startyear=2020&endyear=2020&mountingplace=free&optimalinclination=0&optimalangles=1&js=1&select_database_hourly=PVGIS-SARAH2&hstartyear=2020&hendyear=2020&trackingtype=0&hourlyoptimalangles=1&pvcalculation=1&pvtechchoice=crystSi&peakpower={pv_cap_kW* 1.3}&loss=14&components=1"
+            #https://www.sciencedirect.com/science/article/pii/S0360319922045232#fig1  paper with another variation >> h2 produced only with enought electricity from PV
 
             # Create a temporary file to save the CSV data
             o = NamedTemporaryFile(suffix=".csv", delete=False)
@@ -375,6 +377,29 @@ def show():
             percentage_grid_real = min(max(percentage_grid, 0), 1)
             percentage_pv_real = min(max(percentage_pv, 0), 1)
 
+            #should we add 1-cf duration so we stop hydrogen operation when the production is little?
+
+            # monthly cap begins here:
+            # Extract month and year part and create a new column
+            df['YearMonth'] = df['DateTime'].dt.to_period('M')
+
+            # Group by the month and sum the 'elec_Wh' values
+            monthly_sums = df.groupby('YearMonth')['elec_Wh'].sum().reset_index()
+
+            # Calculate the monthly maximum values based on the number of days in each month
+            monthly_sums['days_in_month'] = monthly_sums['YearMonth'].dt.days_in_month
+            monthly_sums['max_value'] = monthly_sums['days_in_month'] * 24 * electro_capacity_W
+
+            # Cap the monthly sums
+            monthly_sums['Total_elec_Wh_month_capped'] = monthly_sums['elec_Wh'].clip(upper=monthly_sums['max_value'])
+
+            # Calculate the difference
+            monthly_sums['Difference'] = monthly_sums['elec_Wh'] - monthly_sums['Total_elec_Wh_month_capped']
+
+            total_sum_real_month_Wh = monthly_sums['Total_elec_Wh_month_capped'].sum()
+            credit_minus_monthly_extra_Wh = monthly_sums['Difference'].sum()
+            pv_credit_monthly_Wh = necessary_elec_Wh - total_sum_real_month_Wh
+
             # daily cap begins here:
             # Extract date part and create a new column
             df['Date'] = df['DateTime'].dt.date
@@ -406,6 +431,7 @@ def show():
             pv_credit_Wh = necessary_elec_Wh - TOTAL_elec_produced_Wh
             pv_credit_daily_Wh = necessary_elec_Wh - total_sum_real_day_Wh
 
+
             battery_coupling = col2.selectbox("Battery coupled?", ["Yes", "No"], index=1)
 
             if battery_coupling == "No":
@@ -416,7 +442,7 @@ def show():
 
                 col1.write("##### Electricity per year:")
                 col2.write("##### [KWh]")
-                col3.write("##### Allocation options")
+                col3.write("##### Allocation options:")
 
                 col1.write(f"Electrolyzer's total consumption: ")
                 col2.write(f"{Ec_MWh / BoP_LT_y:.2f}MWh")
@@ -433,44 +459,78 @@ def show():
                         col2.markdown(f"{(credit - credit_minus_daily_extra_Wh) / 1000000:.2f}MWh",
                                            unsafe_allow_html=True)
 
-                st.write("##### Select an impact allocation option for electricity:")
 
                 with col3:
                     col1, col2 = st.columns([3, 1])
 
                     # Display text and calculated percentages
                     with col1:
-                        st.write("")
+                        if TOTAL_elec_produced_Wh != real_consumption_Wh:
+                            st.write(":blue-background[Grid - yearly PV credit:]")
+                            st.write(":blue-background[PV + yearly PV credit:]")
+                            if credit_minus_monthly_extra_Wh != 0:
+                                st.write(":gray-background[Grid - monthly PV credit:]")
+                                st.write(":gray-background[PV + monthly PV credit:]")
+                                if credit_minus_daily_extra_Wh != 0:
+                                    st.write(":blue-background[Grid - daily PV credit:]")
+                                    st.write(":blue-background[PV + daily PV credit:]")
                         st.write(":gray-background[Grid (real consumption):]")
                         st.write(":gray-background[PV (real consumption):]")
-                        if TOTAL_elec_produced_Wh != real_consumption_Wh:
-                            st.write(":blue-background[Grid - PV credit:]")
-                            st.write(":blue-background[PV + PV credit:]")
-                            if credit_minus_daily_extra_Wh != 0:
-                                st.write(":gray-background[Grid - daily PV credit:]")
-                                st.write(":gray-background[PV + daily PV credit:]")
 
                     with col2:
-                        st.write("")
+                        percentage_grid_year = pv_credit_Wh / necessary_elec_Wh
+                        percentage_pv_year = 1 - percentage_grid_year
+
+                        percentage_grid_year = min(max(percentage_grid_year, 0), 1)
+                        percentage_pv_year = min(max(percentage_pv_year, 0), 1)
+
+                        if TOTAL_elec_produced_Wh != real_consumption_Wh:
+                            st.write(f'{percentage_grid_year:.2%}', unsafe_allow_html=True)
+                            st.write(f'{percentage_pv_year:.2%}', unsafe_allow_html=True)
+
+                            percentage_grid_month = pv_credit_monthly_Wh / necessary_elec_Wh
+                            percentage_pv_month = 1 - percentage_grid_month
+
+                            if credit_minus_monthly_extra_Wh != 0:
+                                st.write(f'{percentage_grid_month:.2%}', unsafe_allow_html=True)
+                                st.write(f'{percentage_pv_month:.2%}', unsafe_allow_html=True)
+
+                                percentage_grid_day = pv_credit_daily_Wh / necessary_elec_Wh
+                                percentage_pv_day = 1 - percentage_grid_day
+
+                                if credit_minus_daily_extra_Wh != 0:
+                                    st.write(f'{percentage_grid_day:.2%}', unsafe_allow_html=True)
+                                    st.write(f'{percentage_pv_day:.2%}', unsafe_allow_html=True)
+
                         st.write(f'{percentage_grid_real:.2%}', unsafe_allow_html=True)
                         st.write(f'{percentage_pv_real:.2%}', unsafe_allow_html=True)
 
-                        percentage_grid = pv_credit_Wh / necessary_elec_Wh
-                        percentage_pv = 1 - percentage_grid
+                    # Prepare data for plotting
+                    data = {
+                        'Category': ['Year', 'Month', 'Day', 'Real'],
+                        'Grid': [percentage_grid_year, percentage_grid_month, percentage_grid_day,
+                                 percentage_grid_real],
+                        'PV': [percentage_pv_year, percentage_pv_month, percentage_pv_day, percentage_pv_real]
+                    }
 
-                        percentage_grid = min(max(percentage_grid, 0), 1)
-                        percentage_pv = min(max(percentage_pv, 0), 1)
+                    df = pd.DataFrame(data)
 
-                        if TOTAL_elec_produced_Wh != real_consumption_Wh:
-                            st.write(f'{percentage_grid:.2%}', unsafe_allow_html=True)
-                            st.write(f'{percentage_pv:.2%}', unsafe_allow_html=True)
+                    # Plot the data using matplotlib
+                    fig, ax = plt.subplots()
 
-                            percentage_grid = pv_credit_daily_Wh / necessary_elec_Wh
-                            percentage_pv = 1 - percentage_grid
+                    # Plot stacked bar graph
+                    bar_width = 0.35
+                    bar1 = ax.bar(df['Category'], df['Grid'], bar_width, label='Grid', color='#7E868E')
+                    bar2 = ax.bar(df['Category'], df['PV'], bar_width, bottom=df['Grid'], label='PV', color='#FFBE18')
 
-                            if credit_minus_daily_extra_Wh != 0:
-                                st.write(f'{percentage_grid:.2%}', unsafe_allow_html=True)
-                                st.write(f'{percentage_pv:.2%}', unsafe_allow_html=True)
+                    # Add labels and title
+                    ax.set_xlabel('Category')
+                    ax.set_ylabel('Percentage')
+                    ax.set_title('Grid and PV Percentages')
+                    ax.legend()
+
+                    # Display the plot in Streamlit
+                    st.pyplot(fig)
 
             if battery_coupling == "Yes":
                 gif_path = 'H2.gif'
@@ -493,7 +553,7 @@ def show():
                 battery_stored_Wh = 0
                 total_elec_sent_to_battery_Wh = 0
                 total_elec_consumed_from_battery_Wh = 0
-                send_to_grid=0
+                send_to_grid = 0
 
                 # Initialize DataFrame for adjusted daily sums
                 df['Date'] = df['DateTime'].dt.date
@@ -512,7 +572,7 @@ def show():
                         battery_stored_Wh += charged_Wh
                         total_elec_sent_to_battery_Wh += available_to_charge_Wh
                         daily_sums.loc[daily_sums['Date'] == date, 'Adjusted_elec_Wh_day'] += charged_Wh
-                        send_to_grid=surplus_Wh-available_to_charge_Wh
+                        send_to_grid = surplus_Wh - available_to_charge_Wh
                     else:
                         # Discharge the battery if there is no PV production
                         required_from_battery_Wh = min(-surplus_Wh, battery_power_capacity_W * interval_h,
@@ -528,30 +588,28 @@ def show():
 
                 col1.write("##### Electricity per year:")
                 col2.write("##### [MWh]")
-                col3.write("##### Allocation options")
+                col3.write("##### Allocation options:")
 
                 col1.write(f"Electrolyzer's total consumption: ")
                 col2.write(f"{Ec_MWh / BoP_LT_y:.2f}")
                 col1.write("PV production:")
                 col2.markdown(f" {TOTAL_elec_produced_Wh / 1000000:.2f}", unsafe_allow_html=True)
                 col1.write("Electrolyzer's consumption from PV:")
-                col2.markdown(f" {real_consumption_Wh/ 1000000:.2f}", unsafe_allow_html=True)
+                col2.markdown(f" {real_consumption_Wh / 1000000:.2f}", unsafe_allow_html=True)
                 col1.write("Electrolyzer's consumption from PV (and battery):")
                 col2.markdown(f" {(real_consumption_Wh + total_elec_consumed_from_battery_Wh) / 1000000:.2f}",
                               unsafe_allow_html=True)
                 col1.write(f"Electricity sent to the battery:")
-                col2.write(f"{total_elec_sent_to_battery_Wh/1000000:.2f}")
+                col2.write(f"{total_elec_sent_to_battery_Wh / 1000000:.2f}")
                 col1.write(f"Electricity consumed from the battery:")
                 col2.write(f"{total_elec_consumed_from_battery_Wh / eff_charge / 1_000_000: .2f}")
                 col1.write(f"Efficiency losses:")
                 col2.write(f"{efficiency_losses_Wh / 1_000_000: .2f}")
-                col1.write(f"Sent to grid:")
-                col2.write(f"{send_to_grid / 1_000_000: .2f}")
+
 
                 # Updating percentages:
-
                 grid = necessary_elec_Wh - (
-                            real_consumption_Wh + total_elec_consumed_from_battery_Wh)  #now the electricity used from PV gets an increment from battery
+                        real_consumption_Wh + total_elec_consumed_from_battery_Wh)  # now the electricity used from PV gets an increment from battery
 
                 percentage_grid = grid / necessary_elec_Wh
                 percentage_pv = 1 - percentage_grid
@@ -577,45 +635,99 @@ def show():
                 pv_credit_Wh = necessary_elec_Wh - TOTAL_elec_produced_Wh
                 pv_credit_daily_Wh = necessary_elec_Wh - total_sum_real_day_Wh
 
-                with col3:
+                # Monthly cap begins here
+                df['YearMonth'] = df['DateTime'].dt.to_period('M')
 
+                # Group by the month and sum the 'elec_Wh' values
+                monthly_sums = df.groupby('YearMonth')['elec_Wh'].sum().reset_index()
+
+                # Calculate the monthly maximum values based on the number of days in each month
+                monthly_sums['days_in_month'] = monthly_sums['YearMonth'].dt.days_in_month
+                monthly_sums['max_value'] = monthly_sums['days_in_month'] * 24 * electro_capacity_W
+
+                # Cap the monthly sums
+                monthly_sums['Total_elec_Wh_month_capped'] = monthly_sums['elec_Wh'].clip(
+                    upper=monthly_sums['max_value'])
+
+                # Calculate the difference
+                monthly_sums['Difference'] = monthly_sums['elec_Wh'] - monthly_sums['Total_elec_Wh_month_capped']
+
+                total_sum_real_month_Wh = monthly_sums['Total_elec_Wh_month_capped'].sum()
+                credit_minus_monthly_extra_Wh = monthly_sums['Difference'].sum()
+                pv_credit_monthly_Wh = necessary_elec_Wh - total_sum_real_month_Wh
+
+                with col3:
                     col1, col2 = st.columns([3, 1])
 
                     # Display text and calculated percentages
                     with col1:
-                        st.write("")
-                        st.write(":gray-background[Grid (real consumption):]")
-                        st.write(":gray-background[PV (real consumption):]")
                         if TOTAL_elec_produced_Wh != real_consumption_Wh:
                             st.write(":blue-background[Grid - PV credit:]")
                             st.write(":blue-background[PV + PV credit:]")
+                            if credit_minus_monthly_extra_Wh != 0:
+                                st.write(":gray-background[Grid - monthly PV credit:]")
+                                st.write(":gray-background[PV + monthly PV credit:]")
                             if credit_minus_daily_extra_Wh != 0:
-                                st.write(":gray-background[Grid - daily PV credit:]")
-                                st.write(":gray-background[PV + daily PV credit:]")
+                                st.write(":blue-background[Grid - daily PV credit:]")
+                                st.write(":blue-background[PV + daily PV credit:]")
+                        st.write(":gray-background[Grid (real consumption):]")
+                        st.write(":gray-background[PV (real consumption):]")
 
                     with col2:
-                        st.write("")
+                        percentage_grid_year = pv_credit_Wh / necessary_elec_Wh
+                        percentage_pv_year = 1 - percentage_grid_year
+
+                        percentage_grid_year = min(max(percentage_grid_year, 0), 1)
+                        percentage_pv_year = min(max(percentage_pv_year, 0), 1)
+
+                        if TOTAL_elec_produced_Wh != real_consumption_Wh:
+                            st.write(f'{percentage_grid_year:.2%}', unsafe_allow_html=True)
+                            st.write(f'{percentage_pv_year:.2%}', unsafe_allow_html=True)
+
+                            percentage_grid_month = pv_credit_monthly_Wh / necessary_elec_Wh
+                            percentage_pv_month = 1 - percentage_grid_month
+
+                            if credit_minus_monthly_extra_Wh != 0:
+                                st.write(f'{percentage_grid_month:.2%}', unsafe_allow_html=True)
+                                st.write(f'{percentage_pv_month:.2%}', unsafe_allow_html=True)
+
+                                percentage_grid_day = pv_credit_daily_Wh / necessary_elec_Wh
+                                percentage_pv_day = 1 - percentage_grid_day
+
+                                if credit_minus_daily_extra_Wh != 0:
+                                    st.write(f'{percentage_grid_day:.2%}', unsafe_allow_html=True)
+                                    st.write(f'{percentage_pv_day:.2%}', unsafe_allow_html=True)
+
                         st.write(f'{percentage_grid_real:.2%}', unsafe_allow_html=True)
                         st.write(f'{percentage_pv_real:.2%}', unsafe_allow_html=True)
 
-                        percentage_grid = pv_credit_Wh / necessary_elec_Wh
-                        percentage_pv = 1 - percentage_grid
+                    # Prepare data for plotting
+                    data = {
+                        'Category': ['Year', 'Month', 'Day', 'Real'],
+                        'Grid': [percentage_grid_year, percentage_grid_month, percentage_grid_day,
+                                 percentage_grid_real],
+                        'PV': [percentage_pv_year, percentage_pv_month, percentage_pv_day, percentage_pv_real]
+                    }
 
-                        percentage_grid = min(max(percentage_grid, 0), 1)
-                        percentage_pv = min(max(percentage_pv, 0), 1)
+                    df = pd.DataFrame(data)
 
-                        if TOTAL_elec_produced_Wh != real_consumption_Wh:
-                            st.write(f'{percentage_grid:.2%}', unsafe_allow_html=True)
-                            st.write(f'{percentage_pv:.2%}', unsafe_allow_html=True)
+                    # Plot the data using matplotlib
+                    fig, ax = plt.subplots()
 
-                            percentage_grid = pv_credit_daily_Wh / necessary_elec_Wh
-                            percentage_pv = 1 - percentage_grid
+                    # Plot stacked bar graph
+                    bar_width = 0.35
+                    bar1 = ax.bar(df['Category'], df['Grid'], bar_width, label='Grid', color='#7E868E')
+                    bar2 = ax.bar(df['Category'], df['PV'], bar_width, bottom=df['Grid'], label='PV',
+                                  color='#FFBE18')
 
-                            if credit_minus_daily_extra_Wh != 0:
-                                st.write(f'{percentage_grid:.2%}', unsafe_allow_html=True)
-                                st.write(f'{percentage_pv:.2%}', unsafe_allow_html=True)
+                    # Add labels and title
+                    ax.set_xlabel('Category')
+                    ax.set_ylabel('Percentage')
+                    ax.set_title('Grid and PV Percentages')
+                    ax.legend()
 
-
+                    # Display the plot in Streamlit
+                    st.pyplot(fig)
 
     #Indication for background before the data
     colored_header(
