@@ -1256,11 +1256,16 @@ def show():
             "SSP2-R26": ["M0", "M1", "M23", "N1", "N2", "N03"]
         }
     }
+    if 'counter' not in st.session_state:
+        st.session_state.counter = 1
 
+    # Check if 'stored_results' exists in session state, if not, initialize it
+    if 'stored_results' not in st.session_state:
+        st.session_state.stored_results = pd.DataFrame()
 
-
+    order=f"result {st.session_state.counter}"
     def define_system():
-        return agb.newActivity(USER_DB, name=choice2,
+        return agb.newActivity(USER_DB, name=order,
                                unit="kg",
                                exchanges={
                                    production: 1,
@@ -1296,14 +1301,13 @@ def show():
 
     lca_result = result_table_H2.iloc[:, :]
 
-    # Check if 'stored_results' exists in session state, if not, initialize it
-    if 'stored_results' not in st.session_state:
-        st.session_state.stored_results = pd.DataFrame()
-
     # Append the new results to the stored results
-    st.session_state.stored_results = pd.concat([st.session_state.stored_results, lca_result], axis=1)
+    st.session_state.stored_results = pd.concat([st.session_state.stored_results, lca_result], axis=0)
+
+    st.session_state.counter += 1 #update result name
 
     # Transpose the stored results for display
+    #table = st.session_state.stored_results
     transposed_table = st.session_state.stored_results.transpose()
 
     # Display the transposed DataFrame
