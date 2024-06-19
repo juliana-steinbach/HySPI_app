@@ -497,12 +497,18 @@ def show():
                             percentage_grid_month = pv_credit_monthly_Wh / necessary_elec_Wh
                             percentage_pv_month = 1 - percentage_grid_month
 
+                            percentage_grid_month = min(max(percentage_grid_month, 0), 1)
+                            percentage_pv_month = min(max(percentage_pv_month, 0), 1)
+
                             if credit_minus_monthly_extra_Wh != 0:
                                 st.write(f'{percentage_grid_month:.2%}', unsafe_allow_html=True)
                                 st.write(f'{percentage_pv_month:.2%}', unsafe_allow_html=True)
 
                                 percentage_grid_day = pv_credit_daily_Wh / necessary_elec_Wh
                                 percentage_pv_day = 1 - percentage_grid_day
+
+                                percentage_grid_day = min(max(percentage_grid_day, 0), 1)
+                                percentage_pv_day = min(max(percentage_pv_day, 0), 1)
 
                                 if credit_minus_daily_extra_Wh != 0:
                                     st.write(f'{percentage_grid_day:.2%}', unsafe_allow_html=True)
@@ -709,12 +715,18 @@ def show():
                             percentage_grid_month = pv_credit_monthly_Wh / necessary_elec_Wh
                             percentage_pv_month = 1 - percentage_grid_month
 
+                            percentage_grid_month = min(max(percentage_grid_month, 0), 1)
+                            percentage_pv_month = min(max(percentage_pv_month, 0), 1)
+
                             if credit_minus_monthly_extra_Wh != 0:
                                 st.write(f'{percentage_grid_month:.2%}', unsafe_allow_html=True)
                                 st.write(f'{percentage_pv_month:.2%}', unsafe_allow_html=True)
 
                                 percentage_grid_day = pv_credit_daily_Wh / necessary_elec_Wh
                                 percentage_pv_day = 1 - percentage_grid_day
+
+                                percentage_grid_day = min(max(percentage_grid_day, 0), 1)
+                                percentage_pv_day = min(max(percentage_pv_day, 0), 1)
 
                                 if credit_minus_daily_extra_Wh != 0:
                                     st.write(f'{percentage_grid_day:.2%}', unsafe_allow_html=True)
@@ -1282,10 +1294,21 @@ def show():
     # Rename the columns in the result table using the mapping
     result_table_H2.rename(columns=header_mapping, inplace=True)
 
-    transposed_table = result_table_H2.transpose()
+    lca_result = result_table_H2.iloc[:, :]
+
+    # Check if 'stored_results' exists in session state, if not, initialize it
+    if 'stored_results' not in st.session_state:
+        st.session_state.stored_results = pd.DataFrame()
+
+    # Append the new results to the stored results
+    st.session_state.stored_results = pd.concat([st.session_state.stored_results, lca_result], axis=1)
+
+    # Transpose the stored results for display
+    transposed_table = st.session_state.stored_results.transpose()
 
     # Display the transposed DataFrame
     st.table(transposed_table)
+
 
     with st.container():
         paragraph = (
