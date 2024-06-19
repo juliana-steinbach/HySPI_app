@@ -9,6 +9,8 @@ from streamlit_extras.colored_header import colored_header
 import time
 from opencage.geocoder import OpenCageGeocode
 import matplotlib.pyplot as plt
+import plotly.express as px
+
 
 
 def show():
@@ -36,7 +38,7 @@ def show():
     stack_LT = col3.number_input("Stack lifetime (h):", value=120000, min_value=1, step=1)
     BoP_LT_y = col1.number_input("Balance of Plant lifetime (years):", value=20, min_value=1, step=1)
     eff = col2.number_input("Stack efficiency (0 to 1):", value=0.72, min_value=0.0, max_value=1.0, step=0.01)
-    cf = col3.number_input("Capacity factor (0 to 1):", value=1.0, min_value=0.01, max_value=1.00, step=0.05)
+    cf = col3.number_input("Capacity factor (0 to 1):", value=0.95, min_value=0.01, max_value=1.00, step=0.05)
     transp = col3.selectbox("Transport method", ["Pipeline", "Truck"], index=0)
     renewable_coupling = col1.selectbox("Photovoltaic coupled?", ["Yes", "No"], index=1)
     storage_choice = col2.selectbox("Storage", ["Tank", "No storage"], index=1)
@@ -44,7 +46,7 @@ def show():
     electro_capacity_kW = electro_capacity_MW*1_000
     electro_capacity_W = electro_capacity_kW*1_000
     BoP_LT_h = BoP_LT_y * 365 * 24
-    Electricity_consumed_kWh = BoP_LT_h * cf * electro_capacity_kW
+    Electricity_consumed_kWh = BoP_LT_y * 365 * 24 * cf * electro_capacity_kW
     Ec_kWh = int(Electricity_consumed_kWh)
     Ec_MWh = Ec_kWh / 1_000 # Convert kWh to MWh
     Ec_GWh = Ec_kWh / 1_000_000  # Convert kWh to GWh
@@ -309,7 +311,11 @@ def show():
             col1.markdown(f'<div style="padding: 5px; margin: 10px; border: 1px solid #cccccc; border-radius: 5px;"><b>Location selected:</b> {data}</div>', unsafe_allow_html=True)
 
             col3.write("")
-            col3.markdown(':grey[_<div style="text-align: justify;">"With the HySPI calculator, it is now possible to determine if hydrogen produced from PV energy can be considered green. The tool evaluates the PV farm capacity and estimates the environmental impacts based on surplus production credits allocation. Users can also simulate systems with or without dedicated batteries."</div>_]', unsafe_allow_html=True)
+            pv_logo = "pv logo.png"
+            col3.image(pv_logo, caption='')
+            col3.markdown("Solar radiation data was extracted from the PVGIS webapp; It consists of one value for every hour over a multi-year period.")
+            col3.markdown("[PVGIS documentation](https://joint-research-centre.ec.europa.eu/photovoltaic-geographical-information-system-pvgis/getting-started-pvgis/pvgis-user-manual_en)")
+            #col3.markdown(':grey[_<div style="text-align: justify;">"With the HySPI calculator, it is now possible to determine if hydrogen produced from PV energy can be considered green. The tool evaluates the PV farm capacity and estimates the environmental impacts based on surplus production credits allocation. Users can also simulate systems with or without dedicated batteries."</div>_]', unsafe_allow_html=True)
 
         #st.markdown("---")
 
@@ -371,11 +377,11 @@ def show():
             grid = necessary_elec_Wh - real_consumption_Wh #consumed from the grid
             pv_credit_Wh = necessary_elec_Wh - TOTAL_elec_produced_Wh  #keeping this here as it helps to understand the situation in which all PV production is allocated to the impacts rather than the grig
 
-            percentage_grid = grid / necessary_elec_Wh
-            percentage_pv = 1 - percentage_grid
+            percentage_grid_real = grid / necessary_elec_Wh
+            percentage_pv_real = 1 - percentage_grid_real
 
-            percentage_grid_real = min(max(percentage_grid, 0), 1)
-            percentage_pv_real = min(max(percentage_pv, 0), 1)
+            percentage_grid_real = min(max(percentage_grid_real, 0), 1)
+            percentage_pv_real= min(max(percentage_pv_real, 0), 1)
 
             #should we add 1-cf duration so we stop hydrogen operation when the production is little?
 
@@ -438,24 +444,24 @@ def show():
                 gifb_path = 'H2b.gif'
                 col3.image(gifb_path, use_column_width=True)
 
-                col1, col2, col3 = st.columns([2, 1, 2])
+                col4, col2, col3 = st.columns([3, 1, 2])
 
-                col1.write("##### Electricity per year:")
+                col4.write("##### Electricity per year:")
                 col2.write("##### [KWh]")
                 col3.write("##### Allocation options:")
 
-                col1.write(f"Electrolyzer's total consumption: ")
+                col4.write(f"Electrolyzer's total consumption: ")
                 col2.write(f"{Ec_MWh / BoP_LT_y:.2f}MWh")
-                col1.write("PV production:")
+                col4.write("PV production:")
                 col2.markdown(f" {TOTAL_elec_produced_Wh / 1000000:.2f} MWh", unsafe_allow_html=True)
-                col1.write("Electrolyzer's consumption from PV")
+                col4.write("Electrolyzer's consumption from PV")
                 col2.markdown(f" {real_consumption_Wh / 1000000:.2f} MWh", unsafe_allow_html=True)
 
                 if credit > 0:
-                    col1.write("PV surplus production:")
+                    col4.write("PV surplus production:")
                     col2.markdown(f" {credit / 1000000:.2f} MWh", unsafe_allow_html=True)
                     if credit_minus_daily_extra_Wh > 0:
-                        col1.write("PV surplus production (daily cap):")
+                        col4.write("PV surplus production (daily cap):")
                         col2.markdown(f"{(credit - credit_minus_daily_extra_Wh) / 1000000:.2f}MWh",
                                            unsafe_allow_html=True)
 
@@ -505,32 +511,48 @@ def show():
                         st.write(f'{percentage_grid_real:.2%}', unsafe_allow_html=True)
                         st.write(f'{percentage_pv_real:.2%}', unsafe_allow_html=True)
 
-                    # Prepare data for plotting
-                    data = {
-                        'Category': ['Year', 'Month', 'Day', 'Real'],
-                        'Grid': [percentage_grid_year, percentage_grid_month, percentage_grid_day,
-                                 percentage_grid_real],
-                        'PV': [percentage_pv_year, percentage_pv_month, percentage_pv_day, percentage_pv_real]
-                    }
+                allocation = col3.selectbox("Electricity Allocation",
+                                          ["Annual cap", "Monthly cap", "Daily cap", "Real - no cap"], index=2)
+                if allocation == "Annual cap":
+                    percentage_grid = percentage_grid_year
+                    percentage_pv = percentage_pv_year
+                if allocation == "Monthly cap":
+                    percentage_grid = percentage_grid_month
+                    percentage_pv = percentage_pv_month
+                if allocation == "Daily cap":
+                    percentage_grid = percentage_grid_day
+                    percentage_pv = percentage_pv_day
+                if allocation == "Real - no cap":
+                    percentage_grid = percentage_grid_real
+                    percentage_pv = percentage_pv_real
 
-                    df = pd.DataFrame(data)
+                # Prepare data for plotting
+                data = {
+                    'Category': ['Year', 'Month', 'Day', 'Real'],
+                    'Grid': [percentage_grid_year, percentage_grid_month, percentage_grid_day,
+                             percentage_grid_real],
+                    'PV': [percentage_pv_year, percentage_pv_month, percentage_pv_day, percentage_pv_real]
+                }
 
-                    # Plot the data using matplotlib
-                    fig, ax = plt.subplots()
+                df = pd.DataFrame(data)
 
-                    # Plot stacked bar graph
-                    bar_width = 0.35
-                    bar1 = ax.bar(df['Category'], df['Grid'], bar_width, label='Grid', color='#7E868E')
-                    bar2 = ax.bar(df['Category'], df['PV'], bar_width, bottom=df['Grid'], label='PV', color='#FFBE18')
+                # Plot the data using matplotlib
+                fig, ax = plt.subplots(figsize=(5,3))
 
-                    # Add labels and title
-                    ax.set_xlabel('Category')
-                    ax.set_ylabel('Percentage')
-                    ax.set_title('Grid and PV Percentages')
-                    ax.legend()
+                # Plot stacked bar graph
+                bar_width = 0.35
+                bar1 = ax.bar(df['Category'], df['Grid'], bar_width, label='Grid', color='#7E868E')
+                bar2 = ax.bar(df['Category'], df['PV'], bar_width, bottom=df['Grid'], label='PV', color='#FFBE18')
 
-                    # Display the plot in Streamlit
-                    st.pyplot(fig)
+                # Add labels and title
+                ax.set_xlabel('Category')
+                ax.set_ylabel('Percentage')
+                ax.set_title('Grid and PV Percentages')
+                ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+                plt.tight_layout()
+
+                # Display the plot in Streamlit
+                col4.pyplot(fig)
 
             if battery_coupling == "Yes":
                 gif_path = 'H2.gif'
@@ -584,38 +606,38 @@ def show():
                 # Calculate efficiency losses
                 efficiency_losses_Wh = total_elec_sent_to_battery_Wh - total_elec_consumed_from_battery_Wh
 
-                col1, col2, col3 = st.columns([2, 1, 2])
+                col4, col2, col3 = st.columns([3, 1, 2])
 
-                col1.write("##### Electricity per year:")
+                col4.write("##### Electricity per year:")
                 col2.write("##### [MWh]")
                 col3.write("##### Allocation options:")
 
-                col1.write(f"Electrolyzer's total consumption: ")
+                col4.write(f"Electrolyzer's total consumption: ")
                 col2.write(f"{Ec_MWh / BoP_LT_y:.2f}")
-                col1.write("PV production:")
+                col4.write("PV production:")
                 col2.markdown(f" {TOTAL_elec_produced_Wh / 1000000:.2f}", unsafe_allow_html=True)
-                col1.write("Electrolyzer's consumption from PV:")
+                col4.write("Electrolyzer's consumption from PV:")
                 col2.markdown(f" {real_consumption_Wh / 1000000:.2f}", unsafe_allow_html=True)
-                col1.write("Electrolyzer's consumption from PV (and battery):")
+                col4.write("Electrolyzer's consumption from PV (and battery):")
                 col2.markdown(f" {(real_consumption_Wh + total_elec_consumed_from_battery_Wh) / 1000000:.2f}",
                               unsafe_allow_html=True)
-                col1.write(f"Electricity sent to the battery:")
-                col2.write(f"{total_elec_sent_to_battery_Wh / 1000000:.2f}")
-                col1.write(f"Electricity consumed from the battery:")
+                #col4.write(f"Electricity sent to the battery:")
+                #col2.write(f"{total_elec_sent_to_battery_Wh / 1000000:.2f}")
+                col4.write(f"Electricity consumed from the battery:")
                 col2.write(f"{total_elec_consumed_from_battery_Wh / eff_charge / 1_000_000: .2f}")
-                col1.write(f"Efficiency losses:")
-                col2.write(f"{efficiency_losses_Wh / 1_000_000: .2f}")
+                #col4.write(f"Efficiency losses:")
+                #col2.write(f"{efficiency_losses_Wh / 1_000_000: .2f}")
 
 
                 # Updating percentages:
                 grid = necessary_elec_Wh - (
                         real_consumption_Wh + total_elec_consumed_from_battery_Wh)  # now the electricity used from PV gets an increment from battery
 
-                percentage_grid = grid / necessary_elec_Wh
-                percentage_pv = 1 - percentage_grid
+                percentage_grid_real = grid / necessary_elec_Wh
+                percentage_pv_real = 1 - percentage_grid_real
 
-                percentage_grid_real = min(max(percentage_grid, 0), 1)
-                percentage_pv_real = min(max(percentage_pv, 0), 1)
+                percentage_grid_real = min(max(percentage_grid_real, 0), 1)
+                percentage_pv_real = min(max(percentage_pv_real, 0), 1)
 
                 # Adjust daily sums to include battery storage and apply daily cap
                 daily_sums_24 = daily_sums.copy()
@@ -662,8 +684,8 @@ def show():
                     # Display text and calculated percentages
                     with col1:
                         if TOTAL_elec_produced_Wh != real_consumption_Wh:
-                            st.write(":blue-background[Grid - PV credit:]")
-                            st.write(":blue-background[PV + PV credit:]")
+                            st.write(":blue-background[Grid - yearly PV credit:]")
+                            st.write(":blue-background[PV + yearly PV credit:]")
                             if credit_minus_monthly_extra_Wh != 0:
                                 st.write(":gray-background[Grid - monthly PV credit:]")
                                 st.write(":gray-background[PV + monthly PV credit:]")
@@ -701,33 +723,50 @@ def show():
                         st.write(f'{percentage_grid_real:.2%}', unsafe_allow_html=True)
                         st.write(f'{percentage_pv_real:.2%}', unsafe_allow_html=True)
 
-                    # Prepare data for plotting
-                    data = {
-                        'Category': ['Year', 'Month', 'Day', 'Real'],
-                        'Grid': [percentage_grid_year, percentage_grid_month, percentage_grid_day,
-                                 percentage_grid_real],
-                        'PV': [percentage_pv_year, percentage_pv_month, percentage_pv_day, percentage_pv_real]
-                    }
+                allocation = col3.selectbox("Electricity Allocation",
+                                            ["Annual cap", "Monthly cap", "Daily cap", "Real - no cap"],
+                                            index=2)
+                if allocation == "Annual cap":
+                    percentage_grid = percentage_grid_year
+                    percentage_pv = percentage_pv_year
+                if allocation == "Monthly cap":
+                    percentage_grid = percentage_grid_month
+                    percentage_pv = percentage_pv_month
+                if allocation == "Daily cap":
+                    percentage_grid = percentage_grid_day
+                    percentage_pv = percentage_pv_day
+                if allocation == "Real - no cap":
+                    percentage_grid = percentage_grid_real
+                    percentage_pv = percentage_pv_real
 
-                    df = pd.DataFrame(data)
+                # Prepare data for plotting
+                data = {
+                    'Category': ['Year', 'Month', 'Day', 'Real'],
+                    'Grid': [percentage_grid_year, percentage_grid_month, percentage_grid_day,
+                             percentage_grid_real],
+                    'PV': [percentage_pv_year, percentage_pv_month, percentage_pv_day, percentage_pv_real]
+                }
 
-                    # Plot the data using matplotlib
-                    fig, ax = plt.subplots()
+                df = pd.DataFrame(data)
 
-                    # Plot stacked bar graph
-                    bar_width = 0.35
-                    bar1 = ax.bar(df['Category'], df['Grid'], bar_width, label='Grid', color='#7E868E')
-                    bar2 = ax.bar(df['Category'], df['PV'], bar_width, bottom=df['Grid'], label='PV',
-                                  color='#FFBE18')
+                # Plot the data using matplotlib
+                fig, ax = plt.subplots(figsize=(5, 3))
 
-                    # Add labels and title
-                    ax.set_xlabel('Category')
-                    ax.set_ylabel('Percentage')
-                    ax.set_title('Grid and PV Percentages')
-                    ax.legend()
+                # Plot stacked bar graph
+                bar_width = 0.35
+                bar1 = ax.bar(df['Category'], df['Grid'], bar_width, label='Grid', color='#7E868E')
+                bar2 = ax.bar(df['Category'], df['PV'], bar_width, bottom=df['Grid'], label='PV',
+                              color='#FFBE18')
 
-                    # Display the plot in Streamlit
-                    st.pyplot(fig)
+                # Add labels and title
+                ax.set_xlabel('Category')
+                ax.set_ylabel('Percentage')
+                ax.set_title('Grid and PV Percentages')
+                ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+                plt.tight_layout()
+
+                # Display the plot in Streamlit
+                col4.pyplot(fig)
 
     #Indication for background before the data
     colored_header(
@@ -853,6 +892,7 @@ def show():
                     st.write("Demand modelling in progress, not currently available")
     else:
         st.write("Demand modelling in progress, not currently available")
+
 
 
     if data is not None and st.button("Compute result"):
@@ -1011,16 +1051,8 @@ def show():
     t_Stack_activity = negAct(agb.findActivity(name=activity_names[stack_type]['Treatment_Stack'], db_name='AEC/PEM'))
     t_BoP_activity = negAct(agb.findActivity(name=activity_names[stack_type]['Treatment_BoP'], db_name='AEC/PEM'))
 
-    H2_produced = BoP_LT_h * cf * electro_capacity_kW * eff / HHV_kWhkg
-    H2p = int(H2_produced)
-    H2p_ton = H2p / 1000  # Convert kg to tons
-    H2_per_hour = H2p / (BoP_LT_h * cf)
-    Electricity_1kg = Electricity_consumed_kWh / H2_produced  # = HHV/eff
 
-    E1 = round(Electricity_consumed_kWh / H2_produced, 2)
-
-    n_stacks = BoP_LT_h / stack_LT
-
+    #Parametrization for impact mean computation
     #electricity markets parameters
     param_electricity = agb.newEnumParam(
         "param_electricity",  # Short name
@@ -1065,6 +1097,74 @@ def show():
         "EFR2050BRN03N": Elec_FR_2050_BRN03N,
     })
 
+    stack_type_p = agb.newEnumParam(
+        "stack_type_parameter",  # Short name
+        label="stack type pem or aec",  # Label
+        description="PEM or AEC",  # Long description
+        values=[  # Statistic weight of each option that fits with the market
+            "PEM",
+            "AEC"
+        ],
+        default=stack_type
+    )
+
+    stack_LT_p = agb.newFloatParam(
+        "Stack_LT",
+        distrib=agb.DistributionType.TRIANGLE,
+        default=stack_LT, min=30000, max=150000,
+        label="Stack lifetime",
+        description="evolution of the stack lifetime",
+        unit=" ")
+
+    BoP_LT_y_p = agb.newFloatParam(
+        "BOP_LT_y",
+        distrib=agb.DistributionType.TRIANGLE,
+        default=BoP_LT_y, min=20, max=40,
+        label="BoP lifetime y",
+        description="evolution of the BoP lifetime in years",
+        unit=" ")
+
+    eff_p = agb.newFloatParam(
+        "eff",
+        distrib=agb.DistributionType.TRIANGLE,
+        default=eff, min=0.56, max=0.90,  # thermodinamic limits, but not technologial limit
+        label="Stack efficiency",
+        description="evolution of the stack efficiency",
+        unit=" ")
+
+    cf_p = agb.newFloatParam(
+        "cf",
+        distrib=agb.DistributionType.TRIANGLE,
+        default=float(cf), min=float(0.3), max=float(0.95),
+        label="Capacity Factor",
+        description="Capacity factor linked to operational hours",
+        unit=" ")
+
+    #parameters missing:
+    #transp = col3.selectbox("Transport method", ["Pipeline", "Truck"], index=0)
+    #renewable_coupling = col1.selectbox("Photovoltaic coupled?", ["Yes", "No"], index=1)
+    #storage_choice = col2.selectbox("Storage", ["Tank", "No storage"], index=1)
+
+    BoP_LT_h = BoP_LT_y * 365 * 24
+    H2_produced = BoP_LT_h  * cf * electro_capacity_kW * eff / HHV_kWhkg
+    H2p = int(H2_produced)
+    H2p_ton = (H2p / 1000) # Convert kg to tons
+    H2_per_hour = H2p / (BoP_LT_h * cf)
+    Electricity_1kg = (Electricity_consumed_kWh / H2_produced) # = HHV/eff
+
+    E1 = round(Electricity_consumed_kWh / H2_produced, 2)
+
+    n_stacks = BoP_LT_h / stack_LT
+    electro_capacity_kW = electro_capacity_MW * 1_000
+    electro_capacity_W = electro_capacity_kW * 1_000
+
+    Electricity_consumed_kWh = BoP_LT_h * cf * electro_capacity_kW
+    Ec_kWh = int(Electricity_consumed_kWh)
+    Ec_MWh = Ec_kWh / 1_000  # Convert kWh to MWh
+    Ec_GWh = Ec_kWh / 1_000_000  # Convert kWh to GWh
+
+
+
     def define_production():
         return agb.newActivity(USER_DB, "H2 production phase",
                                unit="unit",
@@ -1080,8 +1180,6 @@ def show():
 
     # land factors retrieved from Romain's LCI: no information was given regarding the references for these figures: *ask him!
     land_factor = 0.09 if stack_type == 'PEM' else 0.12
-
-    BoP_LT_y = BoP_LT_h / 365 / 24
 
     # Infrastructure eol
     def define_eol():
@@ -1188,11 +1286,6 @@ def show():
 
     # Display the transposed DataFrame
     st.table(transposed_table)
-
-    #in case we want text, but as tables are better visually, I am keeping this as backup plan
-    #for index, row in result_table_H2.iterrows():
-     #   for column_name, value in row.items():
-      #      st.write(f"{column_name}: {value:.2e}")
 
     with st.container():
         paragraph = (
