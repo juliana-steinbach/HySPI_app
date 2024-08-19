@@ -5,13 +5,12 @@ from six import BytesIO
 from streamlit import cache_data
 from streamlit.web.cli import cache
 import pandas as pd
-CONSTANT=34
 
+CONSTANT=34
 INTERVAL_H = 1
 
 def some_func() :
     return 2
-
 
 @cache_data
 def get_pv_prod_data(lat, lon, pv_cap_kW) :

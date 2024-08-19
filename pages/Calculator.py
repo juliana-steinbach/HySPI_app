@@ -1,5 +1,4 @@
 from io import BytesIO
-
 import lca_algebraic as agb
 from lca_algebraic import *
 import folium
@@ -12,15 +11,15 @@ import time
 from opencage.geocoder import OpenCageGeocode
 import matplotlib.pyplot as plt
 import plotly.express as px
-
+import streamlit as st
+from urllib.request import urlopen
+from tempfile import NamedTemporaryFile
 from lib.utils import some_func, get_pv_prod_data, INTERVAL_H
 
 
-def show():
 
-    import streamlit as st
-    from urllib.request import urlopen
-    from tempfile import NamedTemporaryFile
+def show():
+    import streamlit as st #error if removed from here, why? dnt know....
 
     st.set_page_config(layout="wide")
 
@@ -429,10 +428,14 @@ def show():
                 if credit > 0:
                     col4.write("PV surplus production:")
                     col2.markdown(f" {credit / 1000000:.2f} MWh", unsafe_allow_html=True)
-                    if credit_minus_daily_extra_Wh > 0:
+                    if credit - credit_minus_daily_extra_Wh > 0:
                         col4.write("PV surplus production (daily cap):")
                         col2.markdown(f"{(credit - credit_minus_daily_extra_Wh) / 1000000:.2f}MWh",
                                            unsafe_allow_html=True)
+                    if credit - credit_minus_monthly_extra_Wh != 0:
+                        col4.write("PV surplus production (monthly cap):")
+                        col2.markdown(f"{(credit - credit_minus_monthly_extra_Wh) / 1000000:.2f}MWh",
+                                      unsafe_allow_html=True)
 
 
                 with col3:
@@ -443,12 +446,12 @@ def show():
                         if TOTAL_elec_produced_Wh != hour_consumption_Wh:
                             st.write(":blue-background[Grid - yearly PV credit:]")
                             st.write(":blue-background[PV + yearly PV credit:]")
-                            if credit_minus_monthly_extra_Wh != 0:
-                                st.write(":gray-background[Grid - monthly PV credit:]")
-                                st.write(":gray-background[PV + monthly PV credit:]")
-                                if credit_minus_daily_extra_Wh != 0:
-                                    st.write(":blue-background[Grid - daily PV credit:]")
-                                    st.write(":blue-background[PV + daily PV credit:]")
+                        if credit - credit_minus_monthly_extra_Wh != 0:
+                            st.write(":gray-background[Grid - monthly PV credit:]")
+                            st.write(":gray-background[PV + monthly PV credit:]")
+                        if credit - credit_minus_daily_extra_Wh != 0:
+                            st.write(":blue-background[Grid - daily PV credit:]")
+                            st.write(":blue-background[PV + daily PV credit:]")
                         st.write(":gray-background[Grid (hourly consumption):]")
                         st.write(":gray-background[PV (hourly consumption):]")
 
@@ -456,32 +459,32 @@ def show():
                         percentage_grid_year = pv_credit_Wh / necessary_elec_Wh
                         percentage_pv_year = 1 - percentage_grid_year
 
-                        percentage_grid_year = min(max(percentage_grid_year, 0), 1)
-                        percentage_pv_year = min(max(percentage_pv_year, 0), 1)
+                        plot_percentage_grid_year = min(max(percentage_grid_year, 0), 1)
+                        plot_percentage_pv_year = min(max(percentage_pv_year, 0), 1)
 
                         if TOTAL_elec_produced_Wh != hour_consumption_Wh:
                             st.write(f'{percentage_grid_year:.2%}', unsafe_allow_html=True)
                             st.write(f'{percentage_pv_year:.2%}', unsafe_allow_html=True)
 
-                            percentage_grid_month = pv_credit_monthly_Wh / necessary_elec_Wh
-                            percentage_pv_month = 1 - percentage_grid_month
+                        percentage_grid_month = pv_credit_monthly_Wh / necessary_elec_Wh
+                        percentage_pv_month = 1 - percentage_grid_month
 
-                            percentage_grid_month = min(max(percentage_grid_month, 0), 1)
-                            percentage_pv_month = min(max(percentage_pv_month, 0), 1)
+                        plot_percentage_grid_month = min(max(percentage_grid_month, 0), 1)
+                        plot_percentage_pv_month = min(max(percentage_pv_month, 0), 1)
 
-                            if credit_minus_monthly_extra_Wh != 0:
-                                st.write(f'{percentage_grid_month:.2%}', unsafe_allow_html=True)
-                                st.write(f'{percentage_pv_month:.2%}', unsafe_allow_html=True)
+                        if credit - credit_minus_monthly_extra_Wh != 0:
+                            st.write(f'{percentage_grid_month:.2%}', unsafe_allow_html=True)
+                            st.write(f'{percentage_pv_month:.2%}', unsafe_allow_html=True)
 
-                                percentage_grid_day = pv_credit_daily_Wh / necessary_elec_Wh
-                                percentage_pv_day = 1 - percentage_grid_day
+                        percentage_grid_day = pv_credit_daily_Wh / necessary_elec_Wh
+                        percentage_pv_day = 1 - percentage_grid_day
 
-                                percentage_grid_day = min(max(percentage_grid_day, 0), 1)
-                                percentage_pv_day = min(max(percentage_pv_day, 0), 1)
+                        percentage_grid_day = min(max(percentage_grid_day, 0), 1)
+                        percentage_pv_day = min(max(percentage_pv_day, 0), 1)
 
-                                if credit_minus_daily_extra_Wh != 0:
-                                    st.write(f'{percentage_grid_day:.2%}', unsafe_allow_html=True)
-                                    st.write(f'{percentage_pv_day:.2%}', unsafe_allow_html=True)
+                        if credit - credit_minus_daily_extra_Wh != 0:
+                            st.write(f'{percentage_grid_day:.2%}', unsafe_allow_html=True)
+                            st.write(f'{percentage_pv_day:.2%}', unsafe_allow_html=True)
 
                         st.write(f'{percentage_grid_hour:.2%}', unsafe_allow_html=True)
                         st.write(f'{percentage_pv_hour:.2%}', unsafe_allow_html=True)
@@ -504,9 +507,9 @@ def show():
                 # Prepare data for plotting
                 data = {
                     'Category': ['Year', 'Month', 'Day', 'Hour'],
-                    'Grid': [percentage_grid_year, percentage_grid_month, percentage_grid_day,
+                    'Grid': [plot_percentage_grid_year, plot_percentage_grid_month, percentage_grid_day,
                              percentage_grid_hour],
-                    'PV': [percentage_pv_year, percentage_pv_month, percentage_pv_day, percentage_pv_hour]
+                    'PV': [plot_percentage_pv_year, plot_percentage_pv_month, percentage_pv_day, percentage_pv_hour]
                 }
 
                 df = pd.DataFrame(data)
@@ -661,12 +664,12 @@ def show():
                         if TOTAL_elec_produced_Wh != hour_consumption_Wh:
                             st.write(":blue-background[Grid - yearly PV credit:]")
                             st.write(":blue-background[PV + yearly PV credit:]")
-                            if credit_minus_monthly_extra_Wh != 0:
-                                st.write(":gray-background[Grid - monthly PV credit:]")
-                                st.write(":gray-background[PV + monthly PV credit:]")
-                            if credit_minus_daily_extra_Wh != 0:
-                                st.write(":blue-background[Grid - daily PV credit:]")
-                                st.write(":blue-background[PV + daily PV credit:]")
+                        if credit - credit_minus_monthly_extra_Wh != 0:
+                            st.write(":gray-background[Grid - monthly PV credit:]")
+                            st.write(":gray-background[PV + monthly PV credit:]")
+                        if credit - credit_minus_daily_extra_Wh != 0:
+                            st.write(":blue-background[Grid - daily PV credit:]")
+                            st.write(":blue-background[PV + daily PV credit:]")
                         st.write(":gray-background[Grid (hourly consumption):]")
                         st.write(":gray-background[PV (hourly consumption):]")
 
@@ -674,8 +677,9 @@ def show():
                         percentage_grid_year = pv_credit_Wh / necessary_elec_Wh
                         percentage_pv_year = 1 - percentage_grid_year
 
-                        percentage_grid_year = min(max(percentage_grid_year, 0), 1)
-                        percentage_pv_year = min(max(percentage_pv_year, 0), 1)
+                        plot_percentage_grid_year = min(max(percentage_grid_year, 0), 1)
+                        plot_percentage_pv_year = min(max(percentage_pv_year, 0), 1)
+
 
                         if TOTAL_elec_produced_Wh != hour_consumption_Wh:
                             st.write(f'{percentage_grid_year:.2%}', unsafe_allow_html=True)
@@ -684,22 +688,22 @@ def show():
                             percentage_grid_month = pv_credit_monthly_Wh / necessary_elec_Wh
                             percentage_pv_month = 1 - percentage_grid_month
 
-                            percentage_grid_month = min(max(percentage_grid_month, 0), 1)
-                            percentage_pv_month = min(max(percentage_pv_month, 0), 1)
+                            plot_percentage_grid_month = min(max(percentage_grid_month, 0), 1)
+                            plot_percentage_pv_month = min(max(percentage_pv_month, 0), 1)
 
-                            if credit_minus_monthly_extra_Wh != 0:
+                            if credit - credit_minus_monthly_extra_Wh != 0:
                                 st.write(f'{percentage_grid_month:.2%}', unsafe_allow_html=True)
                                 st.write(f'{percentage_pv_month:.2%}', unsafe_allow_html=True)
 
-                                percentage_grid_day = pv_credit_daily_Wh / necessary_elec_Wh
-                                percentage_pv_day = 1 - percentage_grid_day
+                            percentage_grid_day = pv_credit_daily_Wh / necessary_elec_Wh
+                            percentage_pv_day = 1 - percentage_grid_day
 
-                                percentage_grid_day = min(max(percentage_grid_day, 0), 1)
-                                percentage_pv_day = min(max(percentage_pv_day, 0), 1)
+                            percentage_grid_day = min(max(percentage_grid_day, 0), 1)
+                            percentage_pv_day = min(max(percentage_pv_day, 0), 1)
 
-                                if credit_minus_daily_extra_Wh != 0:
-                                    st.write(f'{percentage_grid_day:.2%}', unsafe_allow_html=True)
-                                    st.write(f'{percentage_pv_day:.2%}', unsafe_allow_html=True)
+                            if credit - credit_minus_daily_extra_Wh != 0:
+                                st.write(f'{percentage_grid_day:.2%}', unsafe_allow_html=True)
+                                st.write(f'{percentage_pv_day:.2%}', unsafe_allow_html=True)
 
                         st.write(f'{percentage_grid_hour:.2%}', unsafe_allow_html=True)
                         st.write(f'{percentage_pv_hour:.2%}', unsafe_allow_html=True)
@@ -724,9 +728,9 @@ def show():
                 # Allocation plot
                 data = {
                     'Category': ['Year', 'Month', 'Day', 'Hour'],
-                    'Grid': [percentage_grid_year, percentage_grid_month, percentage_grid_day,
+                    'Grid': [plot_percentage_grid_year, plot_percentage_grid_month, percentage_grid_day,
                              percentage_grid_hour],
-                    'PV': [percentage_pv_year, percentage_pv_month, percentage_pv_day, percentage_pv_hour]
+                    'PV': [plot_percentage_pv_year, plot_percentage_pv_month, percentage_pv_day, percentage_pv_hour]
                 }
 
                 df = pd.DataFrame(data)
